@@ -1,0 +1,271 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidMadhhab(m) {
+      return m in ['hanafi', 'shafii', 'maliki', 'hanbali'];
+    }
+
+    function isValidLang(l) {
+      return l in ['en', 'hi', 'ur'];
+    }
+
+    function isValidPrayerId(p) {
+      return p in ['fajr', 'zuhr', 'asr', 'maghrib', 'isha'];
+    }
+
+    // Validation Blueprint: UserProfile (/users/{userId})
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'email',
+          'madhhab',
+          'primaryLanguage',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'email',
+          'photoURL',
+          'madhhab',
+          'primaryLanguage',
+          'voiceGender',
+          'playbackSpeed',
+          'characterModel',
+          'theme',
+          'hasCompletedSetup',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && isValidString(data.displayName, 1, 120)
+        && isValidString(data.email, 3, 254)
+        && (!('photoURL' in data) || isValidString(data.photoURL, 0, 500))
+        && isValidMadhhab(data.madhhab)
+        && isValidLang(data.primaryLanguage)
+        && (!('voiceGender' in data) || data.voiceGender in ['male', 'female'])
+        && (!('playbackSpeed' in data) || (data.playbackSpeed is number && data.playbackSpeed >= 0.25 && data.playbackSpeed <= 1.25))
+        && (!('characterModel' in data) || data.characterModel in ['embroidered_thobe', 'gulf_ghutra', 'classic_emerald'])
+        && (!('theme' in data) || data.theme in ['light', 'dark'])
+        && (!('hasCompletedSetup' in data) || data.hasCompletedSetup is bool)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: LearningProgressSummary (/users/{userId}/progress/{progressId})
+    function isValidProgressSummary(data) {
+      return data.keys().hasAll([
+          'uid',
+          'learnedMovements',
+          'reviewedDuas',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'learnedMovements',
+          'reviewedDuas',
+          'lastPrayerId',
+          'lastPrayerTypeId',
+          'lastRakatNumber',
+          'lastStepIndex',
+          'lastActivityTimestamp',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.learnedMovements is list
+        && data.learnedMovements.size() <= 20
+        && (data.learnedMovements.size() == 0 || isValidString(data.learnedMovements[0], 1, 32))
+        && data.reviewedDuas is list
+        && data.reviewedDuas.size() <= 100
+        && (data.reviewedDuas.size() == 0 || isValidString(data.reviewedDuas[0], 1, 64))
+        && (!('lastPrayerId' in data) || isValidString(data.lastPrayerId, 0, 24))
+        && (!('lastPrayerTypeId' in data) || isValidString(data.lastPrayerTypeId, 0, 80))
+        && (!('lastRakatNumber' in data) || (data.lastRakatNumber is int && data.lastRakatNumber >= 0 && data.lastRakatNumber <= 20))
+        && (!('lastStepIndex' in data) || (data.lastStepIndex is int && data.lastStepIndex >= 0 && data.lastStepIndex <= 300))
+        && (!('lastActivityTimestamp' in data) || isValidString(data.lastActivityTimestamp, 0, 40))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: CompletedPrayerSession (/users/{userId}/sessions/{sessionId})
+    function isValidCompletedSession(data) {
+      return data.keys().hasAll([
+          'uid',
+          'prayerId',
+          'prayerTypeId',
+          'categoryLabel',
+          'madhhab',
+          'rakatCount',
+          'completedAt',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'prayerId',
+          'prayerTypeId',
+          'categoryLabel',
+          'madhhab',
+          'rakatCount',
+          'completedAt',
+          'createdAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && isValidPrayerId(data.prayerId)
+        && isValidId(data.prayerTypeId)
+        && data.prayerTypeId.size() <= 80
+        && isValidString(data.categoryLabel, 1, 120)
+        && isValidMadhhab(data.madhhab)
+        && data.rakatCount is int
+        && data.rakatCount >= 1
+        && data.rakatCount <= 20
+        && isValidString(data.completedAt, 10, 40)
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      // PII isolated strictly to verified owner
+      allow get: if isValidId(userId) && isVerifiedOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'displayName',
+            'email',
+            'photoURL',
+            'updatedAt'
+          ])
+          || incoming().diff(existing()).affectedKeys().hasOnly([
+            'madhhab',
+            'primaryLanguage',
+            'voiceGender',
+            'playbackSpeed',
+            'characterModel',
+            'theme',
+            'hasCompletedSetup',
+            'updatedAt'
+          ])
+          || incoming().diff(existing()).affectedKeys().hasOnly([
+            'displayName',
+            'email',
+            'photoURL',
+            'madhhab',
+            'primaryLanguage',
+            'voiceGender',
+            'playbackSpeed',
+            'characterModel',
+            'theme',
+            'hasCompletedSetup',
+            'updatedAt'
+          ])
+        );
+      allow delete: if false;
+
+      match /progress/{progressId} {
+        allow get: if isValidId(userId) && progressId == 'summary' && isVerifiedOwner(userId);
+        allow list: if false;
+        allow create: if isValidId(userId)
+          && progressId == 'summary'
+          && isVerifiedOwner(userId)
+          && isValidProgressSummary(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow update: if isValidId(userId)
+          && progressId == 'summary'
+          && isVerifiedOwner(userId)
+          && isValidProgressSummary(incoming())
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['learnedMovements', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['reviewedDuas', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly([
+              'lastPrayerId',
+              'lastPrayerTypeId',
+              'lastRakatNumber',
+              'lastStepIndex',
+              'lastActivityTimestamp',
+              'updatedAt'
+            ])
+            || incoming().diff(existing()).affectedKeys().hasOnly([
+              'learnedMovements',
+              'reviewedDuas',
+              'lastPrayerId',
+              'lastPrayerTypeId',
+              'lastRakatNumber',
+              'lastStepIndex',
+              'lastActivityTimestamp',
+              'updatedAt'
+            ])
+          );
+        allow delete: if false;
+      }
+
+      match /sessions/{sessionId} {
+        allow get: if isValidId(userId) && isValidId(sessionId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && resource.data.uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(sessionId)
+          && isVerifiedOwner(userId)
+          && isValidCompletedSession(incoming())
+          && incoming().createdAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(sessionId) && isVerifiedOwner(userId);
+      }
+    }
+  }
+}

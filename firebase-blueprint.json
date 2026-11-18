@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and synced Namaz Companion learning preferences.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name from Google profile.",
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email address.",
+          "maxLength": 254
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Optional avatar URL from Google profile.",
+          "maxLength": 500
+        },
+        "madhhab": {
+          "type": "string",
+          "description": "Selected school of Islamic jurisprudence.",
+          "enum": ["hanafi", "shafii", "maliki", "hanbali"],
+          "maxLength": 16
+        },
+        "primaryLanguage": {
+          "type": "string",
+          "description": "Primary translation language.",
+          "enum": ["en", "hi", "ur"],
+          "maxLength": 8
+        },
+        "voiceGender": {
+          "type": "string",
+          "description": "Preferred audio voice gender.",
+          "enum": ["male", "female"],
+          "maxLength": 12
+        },
+        "playbackSpeed": {
+          "type": "number",
+          "description": "Preferred audio recitation playback rate."
+        },
+        "characterModel": {
+          "type": "string",
+          "description": "Selected 3D character appearance ID.",
+          "enum": ["embroidered_thobe", "gulf_ghutra", "classic_emerald"],
+          "maxLength": 32
+        },
+        "theme": {
+          "type": "string",
+          "description": "Display theme preference.",
+          "enum": ["light", "dark"],
+          "maxLength": 12
+        },
+        "hasCompletedSetup": {
+          "type": "boolean",
+          "description": "Whether the user completed initial onboarding."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user document was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user document was last updated."
+        }
+      },
+      "required": ["uid", "displayName", "email", "madhhab", "primaryLanguage", "createdAt", "updatedAt"]
+    },
+    "LearningProgressSummary": {
+      "title": "LearningProgressSummary",
+      "description": "Per-user summary of learned movements, reviewed Duas, and last resume step.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "learnedMovements": {
+          "type": "array",
+          "description": "List of completed posture IDs."
+        },
+        "reviewedDuas": {
+          "type": "array",
+          "description": "List of reviewed Dua and Surah IDs."
+        },
+        "lastPrayerId": {
+          "type": "string",
+          "description": "Last practiced prayer ID or empty string.",
+          "maxLength": 24
+        },
+        "lastPrayerTypeId": {
+          "type": "string",
+          "description": "Last practiced prayer config ID or empty string.",
+          "maxLength": 80
+        },
+        "lastRakatNumber": {
+          "type": "number",
+          "description": "Last Rakat number practiced."
+        },
+        "lastStepIndex": {
+          "type": "number",
+          "description": "Last step index practiced."
+        },
+        "lastActivityTimestamp": {
+          "type": "string",
+          "description": "ISO timestamp of last guided step.",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["uid", "learnedMovements", "reviewedDuas", "createdAt", "updatedAt"]
+    },
+    "CompletedPrayerSession": {
+      "title": "CompletedPrayerSession",
+      "description": "Individual logged guided prayer session completed by the signed-in user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "prayerId": {
+          "type": "string",
+          "description": "Daily prayer identifier.",
+          "enum": ["fajr", "zuhr", "asr", "maghrib", "isha"],
+          "maxLength": 16
+        },
+        "prayerTypeId": {
+          "type": "string",
+          "description": "Specific prayer config identifier.",
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryLabel": {
+          "type": "string",
+          "description": "Human-readable prayer category label (e.g., Fard, Sunnah Muakkadah).",
+          "maxLength": 120
+        },
+        "madhhab": {
+          "type": "string",
+          "description": "Madhhab followed during this session.",
+          "enum": ["hanafi", "shafii", "maliki", "hanbali"],
+          "maxLength": 16
+        },
+        "rakatCount": {
+          "type": "number",
+          "description": "Number of Rakats completed in the session."
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "Client ISO timestamp when the guided prayer finished.",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when session record was logged."
+        }
+      },
+      "required": ["uid", "prayerId", "prayerTypeId", "categoryLabel", "madhhab", "rakatCount", "completedAt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and synced preferences document keyed by Firebase Auth UID."
+    },
+    "/users/{userId}/progress/{progressId}": {
+      "schema": { "$ref": "#/entities/LearningProgressSummary" },
+      "description": "Per-user learning progress summary document (doc ID: summary)."
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/CompletedPrayerSession" },
+      "description": "Per-user completed guided prayer log entries."
+    }
+  }
+}

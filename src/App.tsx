@@ -1,4 +1,5 @@
-import { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type User } from 'firebase/auth';
 import { MotionConfig } from 'motion/react';
 import {
   BookOpen,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { PRAYER_TYPE_CONFIGS } from './data/prayers';
 import { RECITATIONS } from './data/recitations';
+import { AuthAccountBadge } from './components/AuthAccountBadge';
 import { DuaLibraryView } from './components/DuaLibraryView';
 import { GuidedPrayerPlayer } from './components/GuidedPrayerPlayer';
 import { HomeDashboardView } from './components/HomeDashboardView';
@@ -24,6 +26,17 @@ import { PrayerTimingsQiblaView } from './components/PrayerTimingsQiblaView';
 import { SettingsAndAdminView } from './components/SettingsAndAdminView';
 import { WelcomeSetupView } from './components/WelcomeSetupView';
 import { Button, Surface } from './components/ui';
+import {
+  ensureUserProfileAndProgress,
+  logCompletedSessionToFirestore,
+  resetUserProgressInFirestore,
+  signInWithGoogle,
+  signOutUser,
+  subscribeToAuth,
+  subscribeToUserAccount,
+  syncProgressSummaryToFirestore,
+  syncUserPreferencesToFirestore,
+} from './firebase';
 import type {
   LearningProgressState,
   PoseId,
@@ -33,7 +46,7 @@ import type {
   UserPreferences,
 } from './types/namaz';
 import {
-  DEFAULT_PROGRESS,
+  EMPTY_PROGRESS,
   loadCustomPrayerTypes,
   loadCustomRecitations,
   loadPreferences,
@@ -92,6 +105,11 @@ class AppErrorBoundary extends Component<
 }
 
 export default function App() {
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [signingIn, setSigningIn] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const [prefs, setPrefs] = useState<UserPreferences>(() => loadPreferences());
   const [progress, setProgress] = useState<LearningProgressState>(() => loadProgress());
   const [recitationsMap, setRecitationsMap] = useState<Record<string, RecitationRecord>>(
@@ -108,24 +126,146 @@ export default function App() {
   const [playerStartPrep, setPlayerStartPrep] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const authUidRef = useRef<string | null>(null);
+  const stepSyncTimerRef = useRef<number | null>(null);
+
   // Sync display theme attribute on <html>
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', prefs.theme);
   }, [prefs.theme]);
 
+  // Listen for Google Authentication changes
+  useEffect(() => {
+    const unsub = subscribeToAuth((user) => {
+      authUidRef.current = user?.uid ?? null;
+      setAuthUser(user);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Load local per-user cache and attach Firestore real-time listeners when authenticated
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!authUser) {
+      setPrefs(loadPreferences(null));
+      setProgress(loadProgress(null));
+      return;
+    }
+
+    const uid = authUser.uid;
+    const cachedPrefs = loadPreferences(uid);
+    setPrefs(cachedPrefs);
+    setProgress(loadProgress(uid));
+
+    let cancelled = false;
+    let unsubAccount: (() => void) | null = null;
+
+    void (async () => {
+      try {
+        await ensureUserProfileAndProgress(authUser, cachedPrefs);
+        if (cancelled) return;
+        setAuthError(null);
+        unsubAccount = subscribeToUserAccount(uid, {
+          onPrefsLoaded: (patch) => {
+            if (cancelled) return;
+            setPrefs((prev) => {
+              const next = { ...prev, ...patch };
+              savePreferences(next, uid);
+              return next;
+            });
+          },
+          onSummaryLoaded: (summary) => {
+            if (cancelled) return;
+            setProgress((prev) => {
+              const next = {
+                ...prev,
+                learnedMovements: summary.learnedMovements,
+                reviewedDuas: summary.reviewedDuas,
+                lastActivity: summary.lastActivity,
+              };
+              saveProgress(next, uid);
+              return next;
+            });
+          },
+          onSessionsLoaded: (sessions) => {
+            if (cancelled) return;
+            setProgress((prev) => {
+              const next = {
+                ...prev,
+                completedSessions: sessions,
+              };
+              saveProgress(next, uid);
+              return next;
+            });
+          },
+          onSyncError: (err) => {
+            if (!cancelled) {
+              setAuthError(err.message);
+            }
+          },
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setAuthError(err instanceof Error ? err.message : 'Unable to sync account progress.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubAccount?.();
+      if (stepSyncTimerRef.current !== null) {
+        window.clearTimeout(stepSyncTimerRef.current);
+        stepSyncTimerRef.current = null;
+      }
+    };
+  }, [authUser, authLoading]);
+
+  const handleGoogleSignIn = useCallback(async () => {
+    setSigningIn(true);
+    setAuthError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setAuthError(
+        err instanceof Error ? err.message : 'Google sign-in failed. Please try again.',
+      );
+    } finally {
+      setSigningIn(false);
+    }
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    setAuthError(null);
+    try {
+      await signOutUser();
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Unable to sign out right now.');
+    }
+  }, []);
+
   const updatePrefs = useCallback((patch: Partial<UserPreferences>) => {
+    const uid = authUidRef.current;
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
-      savePreferences(next);
+      savePreferences(next, uid);
+      if (uid) {
+        void syncUserPreferencesToFirestore(uid, next).catch((err) => {
+          setAuthError(err instanceof Error ? err.message : 'Failed to save preferences.');
+        });
+      }
       return next;
     });
   }, []);
 
   const updateProgress = useCallback(
     (updater: (prev: LearningProgressState) => LearningProgressState) => {
+      const uid = authUidRef.current;
       setProgress((prev) => {
         const next = updater(prev);
-        saveProgress(next);
+        saveProgress(next, uid);
         return next;
       });
     },
@@ -157,61 +297,114 @@ export default function App() {
   const handleStepChange = useCallback(
     (rakatNumber: number, stepIndex: number) => {
       if (!activeConfig) return;
-      updateProgress((prev) => ({
-        ...prev,
-        lastActivity: {
-          prayerId: activeConfig.prayerId,
-          prayerTypeId: activeConfig.id,
-          rakatNumber,
-          stepIndex,
-          timestamp: new Date().toISOString(),
-        },
-      }));
-    },
-    [activeConfig, updateProgress],
-  );
-
-  const handleCompleteSession = useCallback(
-    (config: PrayerTypeConfig) => {
-      updateProgress((prev) => ({
-        ...prev,
-        completedSessions: [
-          {
-            id: `${config.id}_${Date.now()}`,
-            prayerId: config.prayerId,
-            categoryLabel: config.categoryLabel,
-            madhhab: config.madhhab,
-            rakatCount: config.rakatCount,
-            completedAt: new Date().toISOString(),
+      const uid = authUidRef.current;
+      setProgress((prev) => {
+        const next: LearningProgressState = {
+          ...prev,
+          lastActivity: {
+            prayerId: activeConfig.prayerId,
+            prayerTypeId: activeConfig.id,
+            rakatNumber,
+            stepIndex,
+            timestamp: new Date().toISOString(),
           },
-          ...prev.completedSessions,
-        ].slice(0, 25),
-      }));
+        };
+        saveProgress(next, uid);
+
+        if (uid) {
+          if (stepSyncTimerRef.current !== null) {
+            window.clearTimeout(stepSyncTimerRef.current);
+          }
+          stepSyncTimerRef.current = window.setTimeout(() => {
+            void syncProgressSummaryToFirestore(uid, next).catch((err) => {
+              setAuthError(err instanceof Error ? err.message : 'Failed to sync step progress.');
+            });
+          }, 500);
+        }
+        return next;
+      });
     },
-    [updateProgress],
+    [activeConfig],
   );
 
-  const handleMarkMovementLearned = useCallback(
-    (pose: PoseId) => {
-      updateProgress((prev) =>
-        prev.learnedMovements.includes(pose)
-          ? prev
-          : { ...prev, learnedMovements: [...prev.learnedMovements, pose] },
-      );
-    },
-    [updateProgress],
-  );
+  const handleCompleteSession = useCallback((config: PrayerTypeConfig) => {
+    const uid = authUidRef.current;
+    const completedAt = new Date().toISOString();
+    const sessionId = `${config.id}_${Date.now()}`;
+    const newEntry = {
+      id: sessionId,
+      prayerId: config.prayerId,
+      categoryLabel: config.categoryLabel,
+      madhhab: config.madhhab,
+      rakatCount: config.rakatCount,
+      completedAt,
+    };
 
-  const handleMarkDuaReviewed = useCallback(
-    (id: string) => {
-      updateProgress((prev) =>
-        prev.reviewedDuas.includes(id)
-          ? prev
-          : { ...prev, reviewedDuas: [...prev.reviewedDuas, id] },
-      );
-    },
-    [updateProgress],
-  );
+    setProgress((prev) => {
+      const next: LearningProgressState = {
+        ...prev,
+        completedSessions: [newEntry, ...prev.completedSessions].slice(0, 50),
+      };
+      saveProgress(next, uid);
+      return next;
+    });
+
+    if (uid) {
+      void logCompletedSessionToFirestore(uid, {
+        ...newEntry,
+        prayerTypeId: config.id,
+      }).catch((err) => {
+        setAuthError(err instanceof Error ? err.message : 'Failed to log completed prayer.');
+      });
+    }
+  }, []);
+
+  const handleMarkMovementLearned = useCallback((pose: PoseId) => {
+    const uid = authUidRef.current;
+    setProgress((prev) => {
+      if (prev.learnedMovements.includes(pose)) return prev;
+      const next: LearningProgressState = {
+        ...prev,
+        learnedMovements: [...prev.learnedMovements, pose],
+      };
+      saveProgress(next, uid);
+      if (uid) {
+        void syncProgressSummaryToFirestore(uid, next).catch((err) => {
+          setAuthError(err instanceof Error ? err.message : 'Failed to sync movement progress.');
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleMarkDuaReviewed = useCallback((id: string) => {
+    const uid = authUidRef.current;
+    setProgress((prev) => {
+      if (prev.reviewedDuas.includes(id)) return prev;
+      const next: LearningProgressState = {
+        ...prev,
+        reviewedDuas: [...prev.reviewedDuas, id],
+      };
+      saveProgress(next, uid);
+      if (uid) {
+        void syncProgressSummaryToFirestore(uid, next).catch((err) => {
+          setAuthError(err instanceof Error ? err.message : 'Failed to sync Dua progress.');
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleResetProgress = useCallback(() => {
+    const uid = authUidRef.current;
+    const existingIds = progress.completedSessions.map((s) => s.id);
+    updateProgress(() => EMPTY_PROGRESS);
+    if (uid) {
+      void resetUserProgressInFirestore(uid, existingIds).catch((err) => {
+        setAuthError(err instanceof Error ? err.message : 'Failed to reset cloud progress.');
+      });
+    }
+  }, [progress.completedSessions, updateProgress]);
 
   const handleUpdateRecitation = (id: string, patch: Partial<RecitationRecord>) => {
     setRecitationsMap((prev) => {
@@ -280,41 +473,59 @@ export default function App() {
                 </div>
               </button>
 
-              {/* Desktop Navigation */}
-              <nav aria-label="Primary Navigation" className="hidden md:flex items-center gap-1 flex-wrap justify-end">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  const active =
-                    route === item.id ||
-                    (route === 'player' && item.id === 'home');
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => navigate(item.id)}
-                      className={`inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-control px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                        active
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-foreground hover:bg-surface-alt'
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </nav>
+              {/* Desktop Navigation + Google Account */}
+              <div className="hidden md:flex items-center gap-2 flex-wrap justify-end">
+                <nav aria-label="Primary Navigation" className="flex items-center gap-1 flex-wrap justify-end">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const active =
+                      route === item.id ||
+                      (route === 'player' && item.id === 'home');
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => navigate(item.id)}
+                        className={`inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-control px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                          active
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-foreground hover:bg-surface-alt'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+                <AuthAccountBadge
+                  user={authUser}
+                  authLoading={authLoading}
+                  signingIn={signingIn}
+                  onSignIn={handleGoogleSignIn}
+                  onSignOut={handleSignOut}
+                />
+              </div>
 
-              {/* Mobile Menu Toggle */}
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen((v) => !v)}
-                aria-label="Toggle Menu"
-                aria-expanded={mobileMenuOpen}
-                className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-surface text-foreground cursor-pointer"
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
+              {/* Mobile Controls */}
+              <div className="md:hidden flex items-center gap-2">
+                <AuthAccountBadge
+                  user={authUser}
+                  authLoading={authLoading}
+                  signingIn={signingIn}
+                  onSignIn={handleGoogleSignIn}
+                  onSignOut={handleSignOut}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((v) => !v)}
+                  aria-label="Toggle Menu"
+                  aria-expanded={mobileMenuOpen}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-surface text-foreground cursor-pointer"
+                >
+                  {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             {/* Mobile Dropdown Nav */}
@@ -348,6 +559,22 @@ export default function App() {
 
           {/* Main Workspace */}
           <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 sm:px-6 py-6">
+            {authError && (
+              <div
+                role="alert"
+                className="mb-4 rounded-control border border-accent/60 bg-surface-alt px-4 py-2.5 text-xs text-foreground flex items-center justify-between gap-3"
+              >
+                <span>Account sync notice: {authError}</span>
+                <button
+                  type="button"
+                  onClick={() => setAuthError(null)}
+                  className="text-primary font-medium hover:underline cursor-pointer shrink-0"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {route === 'welcome' && (
               <WelcomeSetupView
                 prefs={prefs}
@@ -428,14 +655,15 @@ export default function App() {
                 progress={progress}
                 recitationsMap={recitationsMap}
                 prayerConfigs={prayerConfigs}
+                authUser={authUser}
+                signingIn={signingIn}
+                onSignIn={handleGoogleSignIn}
+                onSignOut={handleSignOut}
                 onContinueLast={handleContinueLearning}
                 onReviewSession={(cfg) => handleStartPrayerType(cfg, false, 0)}
                 onNavigateMovements={() => navigate('movements')}
                 onNavigateDuas={() => navigate('duas')}
-                onResetProgress={() => {
-                  setProgress(DEFAULT_PROGRESS);
-                  saveProgress(DEFAULT_PROGRESS);
-                }}
+                onResetProgress={handleResetProgress}
               />
             )}
 
@@ -444,6 +672,10 @@ export default function App() {
                 prefs={prefs}
                 recitationsMap={recitationsMap}
                 prayerConfigs={prayerConfigs}
+                authUser={authUser}
+                signingIn={signingIn}
+                onSignIn={handleGoogleSignIn}
+                onSignOut={handleSignOut}
                 onUpdatePrefs={updatePrefs}
                 onUpdateRecitation={handleUpdateRecitation}
                 onUpdatePrayerConfig={handleUpdatePrayerConfig}

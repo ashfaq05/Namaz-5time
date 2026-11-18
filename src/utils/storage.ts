@@ -39,6 +39,13 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   downloadedPacks: ['fajr'],
 };
 
+export const EMPTY_PROGRESS: LearningProgressState = {
+  completedSessions: [],
+  learnedMovements: [],
+  reviewedDuas: [],
+  lastActivity: null,
+};
+
 export const DEFAULT_PROGRESS: LearningProgressState = {
   completedSessions: [
     {
@@ -64,9 +71,10 @@ export const DEFAULT_PROGRESS: LearningProgressState = {
 const VALID_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25] as const;
 const VALID_MODELS = ['embroidered_thobe', 'gulf_ghutra', 'classic_emerald'] as const;
 
-export function loadPreferences(): UserPreferences {
+export function loadPreferences(uid?: string | null): UserPreferences {
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
+    const key = uid ? `${PREFS_KEY}_${uid}` : PREFS_KEY;
+    const raw = localStorage.getItem(key) ?? (uid ? localStorage.getItem(PREFS_KEY) : null);
     if (!raw) return DEFAULT_PREFERENCES;
     const parsed = JSON.parse(raw) as Partial<UserPreferences>;
     return {
@@ -97,39 +105,43 @@ export function loadPreferences(): UserPreferences {
   }
 }
 
-export function savePreferences(prefs: UserPreferences): void {
+export function savePreferences(prefs: UserPreferences, uid?: string | null): void {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    const key = uid ? `${PREFS_KEY}_${uid}` : PREFS_KEY;
+    localStorage.setItem(key, JSON.stringify(prefs));
   } catch {
     // Ignore storage quota errors
   }
 }
 
-export function loadProgress(): LearningProgressState {
+export function loadProgress(uid?: string | null): LearningProgressState {
   try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
-    if (!raw) return DEFAULT_PROGRESS;
+    const key = uid ? `${PROGRESS_KEY}_${uid}` : PROGRESS_KEY;
+    const raw = localStorage.getItem(key);
+    if (!raw) return uid ? EMPTY_PROGRESS : DEFAULT_PROGRESS;
     const parsed = JSON.parse(raw) as Partial<LearningProgressState>;
+    const fallback = uid ? EMPTY_PROGRESS : DEFAULT_PROGRESS;
     return {
       completedSessions: Array.isArray(parsed.completedSessions)
         ? parsed.completedSessions
-        : DEFAULT_PROGRESS.completedSessions,
+        : fallback.completedSessions,
       learnedMovements: Array.isArray(parsed.learnedMovements)
         ? parsed.learnedMovements
-        : DEFAULT_PROGRESS.learnedMovements,
+        : fallback.learnedMovements,
       reviewedDuas: Array.isArray(parsed.reviewedDuas)
         ? parsed.reviewedDuas
-        : DEFAULT_PROGRESS.reviewedDuas,
-      lastActivity: parsed.lastActivity ?? DEFAULT_PROGRESS.lastActivity,
+        : fallback.reviewedDuas,
+      lastActivity: parsed.lastActivity !== undefined ? parsed.lastActivity : fallback.lastActivity,
     };
   } catch {
-    return DEFAULT_PROGRESS;
+    return uid ? EMPTY_PROGRESS : DEFAULT_PROGRESS;
   }
 }
 
-export function saveProgress(progress: LearningProgressState): void {
+export function saveProgress(progress: LearningProgressState, uid?: string | null): void {
   try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    const key = uid ? `${PROGRESS_KEY}_${uid}` : PROGRESS_KEY;
+    localStorage.setItem(key, JSON.stringify(progress));
   } catch {
     // Ignore storage quota errors
   }

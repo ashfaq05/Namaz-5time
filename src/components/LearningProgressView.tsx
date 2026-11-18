@@ -1,4 +1,5 @@
-import { BookCheck, CheckCircle2, Play, RotateCcw } from 'lucide-react';
+import type { User } from 'firebase/auth';
+import { BookCheck, CheckCircle2, Cloud, Play, RotateCcw } from 'lucide-react';
 import { MOVEMENT_LESSONS } from '../data/activities';
 import { MADHHAB_META, PRAYERS } from '../data/prayers';
 import type {
@@ -6,12 +7,17 @@ import type {
   PrayerTypeConfig,
   RecitationRecord,
 } from '../types/namaz';
+import { GoogleLogoIcon } from './AuthAccountBadge';
 import { Button, Surface } from './ui';
 
 interface LearningProgressViewProps {
   progress: LearningProgressState;
   recitationsMap: Record<string, RecitationRecord>;
   prayerConfigs: PrayerTypeConfig[];
+  authUser: User | null;
+  signingIn: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
   onContinueLast: () => void;
   onReviewSession: (config: PrayerTypeConfig) => void;
   onNavigateMovements: () => void;
@@ -23,6 +29,10 @@ export function LearningProgressView({
   progress,
   recitationsMap,
   prayerConfigs,
+  authUser,
+  signingIn,
+  onSignIn,
+  onSignOut,
   onContinueLast,
   onReviewSession,
   onNavigateMovements,
@@ -53,6 +63,55 @@ export function LearningProgressView({
           Reset Progress
         </Button>
       </div>
+
+      {/* Per-User Google Account Sync Banner */}
+      <Surface className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+        {authUser ? (
+          <>
+            <div className="flex items-center gap-3 min-w-0">
+              {authUser.photoURL ? (
+                <img
+                  src={authUser.photoURL}
+                  alt={authUser.displayName || 'User'}
+                  referrerPolicy="no-referrer"
+                  className="h-10 w-10 rounded-full object-cover border border-border shrink-0"
+                />
+              ) : (
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold shrink-0">
+                  {(authUser.displayName || authUser.email || 'U').slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">
+                  {authUser.displayName || 'Signed-in Learner'}
+                </p>
+                <p className="text-xs text-muted flex items-center gap-1.5 truncate">
+                  <Cloud className="h-3.5 w-3.5 text-success shrink-0" />
+                  <span>Progress synced to {authUser.email}</span>
+                </p>
+              </div>
+            </div>
+            <Button tone="quiet" onClick={onSignOut} className="min-h-9 px-3.5 text-xs">
+              Sign out
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="space-y-0.5 min-w-0">
+              <p className="text-sm font-semibold text-foreground">
+                Sign in with Google to save your progress
+              </p>
+              <p className="text-xs text-muted">
+                Every completed prayer, learned posture, and reviewed Dua is logged privately to your account.
+              </p>
+            </div>
+            <Button onClick={onSignIn} disabled={signingIn} className="min-h-10 px-4 text-xs">
+              <GoogleLogoIcon className="h-4 w-4" />
+              {signingIn ? 'Signing in…' : 'Sign in with Google'}
+            </Button>
+          </>
+        )}
+      </Surface>
 
       {/* Explicit specification notice (Screen 14 & Section 4) */}
       <div className="rounded-control border border-accent/45 bg-surface-alt px-4 py-3 text-sm text-foreground">

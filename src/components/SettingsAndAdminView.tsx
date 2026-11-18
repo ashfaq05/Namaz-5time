@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import type { User } from 'firebase/auth';
 import {
   CheckCircle2,
+  Cloud,
   Download,
   FileCheck2,
   RotateCcw,
@@ -22,6 +24,7 @@ import type {
   VoiceGender,
 } from '../types/namaz';
 import { CALCULATION_METHODS, PRESET_CITIES } from '../utils/astronomy';
+import { GoogleLogoIcon } from './AuthAccountBadge';
 import { Button, Field, SelectInput, Surface, TextInput, ToggleSwitch } from './ui';
 
 interface SettingsAndAdminViewProps {
@@ -29,6 +32,10 @@ interface SettingsAndAdminViewProps {
   recitationsMap: Record<string, RecitationRecord>;
   prayerConfigs: PrayerTypeConfig[];
   initialTab?: 'settings' | 'admin';
+  authUser: User | null;
+  signingIn: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
   onUpdatePrefs: (patch: Partial<UserPreferences>) => void;
   onUpdateRecitation: (id: string, patch: Partial<RecitationRecord>) => void;
   onUpdatePrayerConfig: (id: string, patch: Partial<PrayerTypeConfig>) => void;
@@ -49,6 +56,10 @@ export function SettingsAndAdminView({
   recitationsMap,
   prayerConfigs,
   initialTab = 'settings',
+  authUser,
+  signingIn,
+  onSignIn,
+  onSignOut,
   onUpdatePrefs,
   onUpdateRecitation,
   onUpdatePrayerConfig,
@@ -122,6 +133,53 @@ export function SettingsAndAdminView({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Core Preferences */}
           <Surface className="lg:col-span-7 p-6 space-y-6">
+            {/* Google Account & Cloud Sync */}
+            <div className="rounded-control border border-border/80 bg-surface-alt p-4 flex flex-wrap items-center justify-between gap-3">
+              {authUser ? (
+                <>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {authUser.photoURL ? (
+                      <img
+                        src={authUser.photoURL}
+                        alt={authUser.displayName || 'User'}
+                        referrerPolicy="no-referrer"
+                        className="h-9 w-9 rounded-full object-cover border border-border shrink-0"
+                      />
+                    ) : (
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold shrink-0">
+                        {(authUser.displayName || authUser.email || 'U').slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {authUser.displayName || 'Signed-in User'}
+                      </p>
+                      <p className="text-xs text-muted flex items-center gap-1 truncate">
+                        <Cloud className="h-3 w-3 text-success shrink-0" />
+                        <span>{authUser.email} · Synced</span>
+                      </p>
+                    </div>
+                  </div>
+                  <Button tone="quiet" onClick={onSignOut} className="min-h-9 px-3 text-xs">
+                    Sign out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Google Account Sync</p>
+                    <p className="text-xs text-muted">
+                      Sign in to save your prayer logs and preferences across sessions.
+                    </p>
+                  </div>
+                  <Button onClick={onSignIn} disabled={signingIn} className="min-h-9 px-3 text-xs">
+                    <GoogleLogoIcon className="h-3.5 w-3.5" />
+                    {signingIn ? 'Signing in…' : 'Sign in with Google'}
+                  </Button>
+                </>
+              )}
+            </div>
+
             <div className="flex items-center justify-between border-b border-border/70 pb-3">
               <h2 className="text-lg font-semibold text-foreground">
                 Jurisprudence, Languages & Level
