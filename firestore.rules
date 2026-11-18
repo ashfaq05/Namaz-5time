@@ -70,6 +70,7 @@ service cloud.firestore {
           'characterModel',
           'theme',
           'hasCompletedSetup',
+          'timeZone',
           'createdAt',
           'updatedAt'
         ])
@@ -85,6 +86,7 @@ service cloud.firestore {
         && (!('characterModel' in data) || data.characterModel in ['embroidered_thobe', 'gulf_ghutra', 'classic_emerald'])
         && (!('theme' in data) || data.theme in ['light', 'dark'])
         && (!('hasCompletedSetup' in data) || data.hasCompletedSetup is bool)
+        && (!('timeZone' in data) || isValidString(data.timeZone, 1, 64))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -193,6 +195,7 @@ service cloud.firestore {
             'characterModel',
             'theme',
             'hasCompletedSetup',
+            'timeZone',
             'updatedAt'
           ])
           || incoming().diff(existing()).affectedKeys().hasOnly([
@@ -206,6 +209,7 @@ service cloud.firestore {
             'characterModel',
             'theme',
             'hasCompletedSetup',
+            'timeZone',
             'updatedAt'
           ])
         );

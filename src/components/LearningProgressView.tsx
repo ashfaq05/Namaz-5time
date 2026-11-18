@@ -7,6 +7,7 @@ import type {
   PrayerTypeConfig,
   RecitationRecord,
 } from '../types/namaz';
+import { formatDateInTimeZone } from '../utils/astronomy';
 import { GoogleLogoIcon } from './AuthAccountBadge';
 import { Button, Surface } from './ui';
 
@@ -14,6 +15,7 @@ interface LearningProgressViewProps {
   progress: LearningProgressState;
   recitationsMap: Record<string, RecitationRecord>;
   prayerConfigs: PrayerTypeConfig[];
+  timeZone?: string;
   authUser: User | null;
   signingIn: boolean;
   onSignIn: () => void;
@@ -29,6 +31,7 @@ export function LearningProgressView({
   progress,
   recitationsMap,
   prayerConfigs,
+  timeZone,
   authUser,
   signingIn,
   onSignIn,
@@ -213,7 +216,7 @@ export function LearningProgressView({
                       </p>
                       <p className="text-xs text-muted">
                         {MADHHAB_META[sess.madhhab].name} · {sess.rakatCount} Rakat ·{' '}
-                        {new Date(sess.completedAt).toLocaleDateString()}
+                        {formatDateInTimeZone(sess.completedAt, timeZone)}
                       </p>
                     </div>
                   </div>

@@ -5,6 +5,33 @@ export const KAABA_COORDS = {
   lon: 39.826206,
 };
 
+export interface TimeZoneOption {
+  id: string;
+  label: string;
+  shortLabel: string;
+}
+
+export const TIMEZONE_OPTIONS: TimeZoneOption[] = [
+  { id: 'auto', label: 'Device Local Time (Auto-detect)', shortLabel: 'Local' },
+  { id: 'Asia/Kolkata', label: 'IST — India Standard Time (UTC+05:30)', shortLabel: 'IST' },
+  { id: 'Asia/Karachi', label: 'PKT — Pakistan Standard Time (UTC+05:00)', shortLabel: 'PKT' },
+  { id: 'Asia/Dhaka', label: 'BST — Bangladesh Standard Time (UTC+06:00)', shortLabel: 'BST' },
+  { id: 'Asia/Dubai', label: 'GST — UAE / Gulf Time (UTC+04:00)', shortLabel: 'GST' },
+  { id: 'Asia/Riyadh', label: 'AST — Makkah / Madinah / Arabia (UTC+03:00)', shortLabel: 'AST' },
+  { id: 'Europe/Istanbul', label: 'TRT — Turkey Time (UTC+03:00)', shortLabel: 'TRT' },
+  { id: 'Africa/Cairo', label: 'EET — Egypt Time (UTC+02:00)', shortLabel: 'EET' },
+  { id: 'Europe/London', label: 'GMT / BST — London (UTC+00:00 / +01:00)', shortLabel: 'UK' },
+  { id: 'Europe/Paris', label: 'CET — Central Europe (UTC+01:00 / +02:00)', shortLabel: 'CET' },
+  { id: 'America/New_York', label: 'EST / EDT — US Eastern (UTC-05:00 / -04:00)', shortLabel: 'ET' },
+  { id: 'America/Chicago', label: 'CST / CDT — US Central (UTC-06:00 / -05:00)', shortLabel: 'CT' },
+  { id: 'America/Los_Angeles', label: 'PST / PDT — US Pacific (UTC-08:00 / -07:00)', shortLabel: 'PT' },
+  { id: 'Asia/Kuala_Lumpur', label: 'MYT — Malaysia Time (UTC+08:00)', shortLabel: 'MYT' },
+  { id: 'Asia/Jakarta', label: 'WIB — Western Indonesia Time (UTC+07:00)', shortLabel: 'WIB' },
+  { id: 'Asia/Singapore', label: 'SGT — Singapore Time (UTC+08:00)', shortLabel: 'SGT' },
+  { id: 'Australia/Sydney', label: 'AEST / AEDT — Sydney (UTC+10:00 / +11:00)', shortLabel: 'AET' },
+  { id: 'UTC', label: 'UTC — Coordinated Universal Time (UTC+00:00)', shortLabel: 'UTC' },
+];
+
 export const PRESET_CITIES: CityLocation[] = [
   { id: 'delhi', name: 'New Delhi', country: 'India', lat: 28.6139, lon: 77.209, timezoneOffsetHours: 5.5 },
   { id: 'lucknow', name: 'Lucknow', country: 'India', lat: 26.8467, lon: 80.9462, timezoneOffsetHours: 5.5 },
@@ -76,6 +103,132 @@ export const CALCULATION_METHODS: Record<CalculationMethodId, CalculationMethodM
   },
 };
 
+export interface ZonedDateParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  offsetHours: number;
+  resolvedTimeZone: string;
+  shortZoneName: string;
+}
+
+export function resolveEffectiveTimeZone(timeZone?: string): string {
+  if (!timeZone || timeZone === 'auto') {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch {
+      return 'UTC';
+    }
+  }
+  return timeZone;
+}
+
+export function getZonedDateParts(date: Date, timeZone?: string): ZonedDateParts {
+  const resolved = resolveEffectiveTimeZone(timeZone);
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: resolved,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+      timeZoneName: 'short',
+    });
+    const parts = dtf.formatToParts(date);
+    const getNum = (type: Intl.DateTimeFormatPartTypes, fallback: number) => {
+      const val = Number(parts.find((p) => p.type === type)?.value);
+      return Number.isFinite(val) ? val : fallback;
+    };
+    const year = getNum('year', date.getFullYear());
+    const month = getNum('month', date.getMonth() + 1);
+    const day = getNum('day', date.getDate());
+    const hour = getNum('hour', date.getHours()) % 24;
+    const minute = getNum('minute', date.getMinutes());
+    const second = getNum('second', date.getSeconds());
+
+    const utcTarget = Date.UTC(year, month - 1, day, hour, minute, second);
+    const utcNow = Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds(),
+    );
+    const offsetMinutes = Math.round((utcTarget - utcNow) / 60000);
+    const offsetHours = offsetMinutes / 60;
+
+    const rawZoneName = parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+    const presetMatch = TIMEZONE_OPTIONS.find((z) => z.id === resolved);
+    const shortZoneName =
+      resolved === 'Asia/Kolkata'
+        ? 'IST'
+        : presetMatch?.shortLabel ?? (rawZoneName || resolved);
+
+    return {
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      second,
+      offsetHours,
+      resolvedTimeZone: resolved,
+      shortZoneName,
+    };
+  } catch {
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      second: date.getSeconds(),
+      offsetHours: -date.getTimezoneOffset() / 60,
+      resolvedTimeZone: 'UTC',
+      shortZoneName: 'Local',
+    };
+  }
+}
+
+export function formatCurrentTime(
+  date: Date,
+  timeZone?: string,
+  includeSeconds = true,
+): string {
+  const zoned = getZonedDateParts(date, timeZone);
+  const h12 = zoned.hour % 12 === 0 ? 12 : zoned.hour % 12;
+  const suffix = zoned.hour >= 12 ? 'PM' : 'AM';
+  const mm = String(zoned.minute).padStart(2, '0');
+  const ss = String(zoned.second).padStart(2, '0');
+  const clock = includeSeconds ? `${h12}:${mm}:${ss} ${suffix}` : `${h12}:${mm} ${suffix}`;
+  return `${clock} ${zoned.shortZoneName}`;
+}
+
+export function formatDateInTimeZone(
+  isoOrDate: string | Date,
+  timeZone?: string,
+): string {
+  const date = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
+  const resolved = resolveEffectiveTimeZone(timeZone);
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: resolved,
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return date.toLocaleDateString();
+  }
+}
+
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 
@@ -115,7 +268,7 @@ function hourAngle(lat: number, decl: number, elevationDeg: number): number {
 }
 
 export interface DailyPrayerTimes {
-  fajr: number; // hours in local day (0..24)
+  fajr: number; // hours in selected timezone day (0..24)
   sunrise: number;
   zuhr: number;
   asr: number;
@@ -128,13 +281,17 @@ export function computeDailyPrayerTimes(
   location: CityLocation,
   methodId: CalculationMethodId,
   asrMethod: 'standard' | 'hanafi',
+  timeZone?: string,
 ): DailyPrayerTimes {
   const method = CALCULATION_METHODS[methodId];
-  const jd = julianDay(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  const zoned = getZonedDateParts(date, timeZone);
+  const jd = julianDay(zoned.year, zoned.month, zoned.day);
   const { declination, eqTimeMinutes } = sunPosition(jd);
 
+  // Express prayer times in the same selected timezone used for the current clock & countdown
+  const effectiveOffsetHours = timeZone ? zoned.offsetHours : location.timezoneOffsetHours;
   const solarNoon =
-    12 + location.timezoneOffsetHours - location.lon / 15 - eqTimeMinutes / 60;
+    12 + effectiveOffsetHours - location.lon / 15 - eqTimeMinutes / 60;
 
   const fajrHA = hourAngle(location.lat, declination, -method.fajrAngle);
   const sunriseHA = hourAngle(location.lat, declination, -0.833);
@@ -170,8 +327,10 @@ export function formatHourFloat(hourFloat: number): string {
 export function getNextPrayerCountdown(
   now: Date,
   times: DailyPrayerTimes,
+  timeZone?: string,
 ): { nextPrayerId: PrayerId; label: string; timeStr: string; countdownStr: string } {
-  const currentHours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const zoned = getZonedDateParts(now, timeZone);
+  const currentHours = zoned.hour + zoned.minute / 60 + zoned.second / 3600;
   const ordered: Array<{ id: PrayerId; label: string; hour: number }> = [
     { id: 'fajr', label: 'Fajr', hour: times.fajr },
     { id: 'zuhr', label: 'Zuhr', hour: times.zuhr },
@@ -228,9 +387,11 @@ export function computeDistanceToMakkahKm(lat: number, lon: number): number {
   return Math.round(R * c);
 }
 
-export function formatHijriDate(date: Date): string {
+export function formatHijriDate(date: Date, timeZone?: string): string {
+  const resolved = resolveEffectiveTimeZone(timeZone);
   try {
     return new Intl.DateTimeFormat('en-TN-u-ca-islamic-umalqura', {
+      timeZone: resolved,
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -240,11 +401,22 @@ export function formatHijriDate(date: Date): string {
   }
 }
 
-export function formatGregorianDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date);
+export function formatGregorianDate(date: Date, timeZone?: string): string {
+  const resolved = resolveEffectiveTimeZone(timeZone);
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: resolved,
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  }
 }

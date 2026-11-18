@@ -133,6 +133,7 @@ export interface UserPreferences {
   madhhab: MadhhabId;
   learningLevel: LearningLevel;
   location: CityLocation;
+  timeZone: string; // IANA timezone (e.g. 'Asia/Kolkata') or 'auto' for device timezone
   calculationMethod: CalculationMethodId;
   asrMethod: 'standard' | 'hanafi';
   audioVolume: number; // 0 to 1

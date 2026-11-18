@@ -9,7 +9,7 @@ import type {
   MadhhabId,
   UserPreferences,
 } from '../types/namaz';
-import { PRESET_CITIES } from '../utils/astronomy';
+import { PRESET_CITIES, TIMEZONE_OPTIONS } from '../utils/astronomy';
 import { Button, Field, IslamicPatternAccent, SelectInput, Surface } from './ui';
 
 interface WelcomeSetupViewProps {
@@ -260,6 +260,24 @@ export function WelcomeSetupView({
             </div>
           </Field>
         </div>
+
+        <Field
+          label="5. Timezone (for Current Clock & Prayer Times)"
+          id="setup-timezone"
+          hint="Pick IST (India Standard Time) or leave on Auto-detect."
+        >
+          <SelectInput
+            id="setup-timezone"
+            value={prefs.timeZone}
+            onChange={(e) => onUpdatePrefs({ timeZone: e.target.value })}
+          >
+            {TIMEZONE_OPTIONS.map((tz) => (
+              <option key={tz.id} value={tz.id}>
+                {tz.label}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
 
         <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-5">
           <Button tone="quiet" onClick={() => setStep('welcome')}>

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import {
   CheckCircle2,
+  Clock,
   Cloud,
   Download,
   FileCheck2,
@@ -23,7 +24,12 @@ import type {
   UserPreferences,
   VoiceGender,
 } from '../types/namaz';
-import { CALCULATION_METHODS, PRESET_CITIES } from '../utils/astronomy';
+import {
+  CALCULATION_METHODS,
+  PRESET_CITIES,
+  TIMEZONE_OPTIONS,
+  formatCurrentTime,
+} from '../utils/astronomy';
 import { GoogleLogoIcon } from './AuthAccountBadge';
 import { Button, Field, SelectInput, Surface, TextInput, ToggleSwitch } from './ui';
 
@@ -70,6 +76,12 @@ export function SettingsAndAdminView({
   const [editingRecId, setEditingRecId] = useState<string>('fatiha');
   const [adminStatusMsg, setAdminStatusMsg] = useState<string>('');
   const [adminFilterMadhhab, setAdminFilterMadhhab] = useState<MadhhabId>(prefs.madhhab);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const toggleLanguage = (code: LanguageCode) => {
     const exists = prefs.languages.includes(code);
@@ -281,6 +293,36 @@ export function SettingsAndAdminView({
                   ))}
                 </SelectInput>
               </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+              <Field
+                label="Timezone (Local Clock & Prayer Times)"
+                id="set-timezone"
+                hint="Pick IST (India Standard Time) or any region if your browser clock is off."
+              >
+                <SelectInput
+                  id="set-timezone"
+                  value={prefs.timeZone}
+                  onChange={(e) => onUpdatePrefs({ timeZone: e.target.value })}
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.id} value={tz.id}>
+                      {tz.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              </Field>
+
+              <div className="rounded-control border border-border/80 bg-surface-alt px-3.5 py-2.5 flex items-center justify-between gap-2 min-h-11">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  Current Time
+                </span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">
+                  {formatCurrentTime(now, prefs.timeZone)}
+                </span>
+              </div>
             </div>
 
             <div className="border-t border-border/70 pt-5 space-y-4">

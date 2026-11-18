@@ -65,6 +65,11 @@
           "type": "boolean",
           "description": "Whether the user completed initial onboarding."
         },
+        "timeZone": {
+          "type": "string",
+          "description": "Preferred IANA timezone identifier or 'auto'.",
+          "maxLength": 64
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

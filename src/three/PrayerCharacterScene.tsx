@@ -17,6 +17,8 @@ interface PrayerCharacterSceneProps {
   className?: string;
   compact?: boolean;
   fullScreenMode?: boolean;
+  hideCameraDock?: boolean;
+  cameraResetNonce?: number;
   caption?: string;
 }
 
@@ -545,6 +547,8 @@ export function PrayerCharacterScene({
   className = '',
   compact = false,
   fullScreenMode = false,
+  hideCameraDock = false,
+  cameraResetNonce = 0,
   caption,
 }: PrayerCharacterSceneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -565,7 +569,7 @@ export function PrayerCharacterScene({
   useEffect(() => {
     setActivePreset(cameraPreset);
     presetTriggerRef.current?.(cameraPreset);
-  }, [cameraPreset]);
+  }, [cameraPreset, cameraResetNonce]);
 
   useEffect(() => {
     themeRef.current = theme;
@@ -1571,56 +1575,58 @@ export function PrayerCharacterScene({
       )}
 
       {/* Collapsible camera dock */}
-      <div
-        className={`pointer-events-none absolute flex flex-col gap-1.5 ${
-          fullScreenMode
-            ? 'top-16 right-3 sm:right-4 items-end'
-            : 'inset-x-0 bottom-3 items-center px-3'
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => setControlsHidden((v) => !v)}
-          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-surface/90 px-3 py-1 text-xs font-medium text-muted hover:text-foreground cursor-pointer"
+      {!hideCameraDock && (
+        <div
+          className={`pointer-events-none absolute flex flex-col gap-1.5 ${
+            fullScreenMode
+              ? 'bottom-3 right-3 sm:top-20 sm:bottom-auto sm:right-4 items-end'
+              : 'inset-x-0 bottom-3 items-center px-3'
+          }`}
         >
-          {controlsHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          {controlsHidden ? 'Camera' : 'Hide Camera'}
-        </button>
+          <button
+            type="button"
+            onClick={() => setControlsHidden((v) => !v)}
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-surface/90 px-3 py-1 text-xs font-medium text-muted hover:text-foreground cursor-pointer"
+          >
+            {controlsHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {controlsHidden ? 'Camera' : 'Hide Camera'}
+          </button>
 
-        {!controlsHidden && (
-          <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1.5 rounded-card border border-border/85 bg-surface/92 px-2.5 py-1.5 shadow-sm">
-            {(
-              [
-                { id: 'three_quarter', label: '3/4 Angle' },
-                { id: 'front', label: 'Front View' },
-                { id: 'side', label: 'Side Profile' },
-              ] as const
-            ).map((btn) => (
+          {!controlsHidden && (
+            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1.5 rounded-card border border-border/85 bg-surface/92 px-2.5 py-1.5 shadow-sm">
+              {(
+                [
+                  { id: 'three_quarter', label: '3/4 Angle' },
+                  { id: 'front', label: 'Front View' },
+                  { id: 'side', label: 'Side Profile' },
+                ] as const
+              ).map((btn) => (
+                <button
+                  key={btn.id}
+                  type="button"
+                  onClick={() => handleSelectPreset(btn.id)}
+                  className={`min-h-8 whitespace-nowrap rounded-control px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                    activePreset === btn.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground hover:bg-surface-alt'
+                  }`}
+                >
+                  {btn.label}
+                </button>
+              ))}
               <button
-                key={btn.id}
                 type="button"
-                onClick={() => handleSelectPreset(btn.id)}
-                className={`min-h-8 whitespace-nowrap rounded-control px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                  activePreset === btn.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground hover:bg-surface-alt'
-                }`}
+                onClick={() => handleSelectPreset('three_quarter')}
+                title="Reset View"
+                className="inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-control border border-border/80 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-surface-alt cursor-pointer"
               >
-                {btn.label}
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('three_quarter')}
-              title="Reset View"
-              className="inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-control border border-border/80 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-surface-alt cursor-pointer"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
-            </button>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

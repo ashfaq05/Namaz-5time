@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Bell, BellOff, Compass, MapPin, Navigation } from 'lucide-react';
+import { Bell, BellOff, Clock, Compass, MapPin, Navigation } from 'lucide-react';
 import type { CalculationMethodId, PrayerId, UserPreferences } from '../types/namaz';
 import {
   CALCULATION_METHODS,
   PRESET_CITIES,
+  TIMEZONE_OPTIONS,
   computeDailyPrayerTimes,
   computeDistanceToMakkahKm,
   computeQiblaBearing,
+  formatCurrentTime,
   formatGregorianDate,
   formatHijriDate,
   formatHourFloat,
@@ -59,8 +61,9 @@ export function PrayerTimingsQiblaView({
     prefs.location,
     prefs.calculationMethod,
     prefs.asrMethod,
+    prefs.timeZone,
   );
-  const nextInfo = getNextPrayerCountdown(now, times);
+  const nextInfo = getNextPrayerCountdown(now, times, prefs.timeZone);
   const qiblaBearing = computeQiblaBearing(prefs.location.lat, prefs.location.lon);
   const makkahDistKm = computeDistanceToMakkahKm(prefs.location.lat, prefs.location.lon);
 
@@ -128,7 +131,10 @@ export function PrayerTimingsQiblaView({
             Prayer Timings & Qibla Compass
           </h1>
           <p className="text-sm text-muted mt-1">
-            {formatGregorianDate(now)} · {formatHijriDate(now)}
+            {formatGregorianDate(now, prefs.timeZone)} · {formatHijriDate(now, prefs.timeZone)} ·{' '}
+            <strong className="text-foreground tabular-nums">
+              {formatCurrentTime(now, prefs.timeZone)}
+            </strong>
           </p>
         </div>
 
@@ -149,9 +155,9 @@ export function PrayerTimingsQiblaView({
         </div>
       </div>
 
-      {/* Location & Method Controls Bar */}
+      {/* Location, Timezone & Method Controls Bar */}
       <Surface className="p-4 md:p-5">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <Field label="City / Coordinates" id="city-select">
             <SelectInput
               id="city-select"
@@ -169,6 +175,20 @@ export function PrayerTimingsQiblaView({
               {PRESET_CITIES.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}, {c.country}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+
+          <Field label="Timezone" id="timings-timezone">
+            <SelectInput
+              id="timings-timezone"
+              value={prefs.timeZone}
+              onChange={(e) => onUpdatePrefs({ timeZone: e.target.value })}
+            >
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.id} value={tz.id}>
+                  {tz.label}
                 </option>
               ))}
             </SelectInput>
@@ -220,7 +240,13 @@ export function PrayerTimingsQiblaView({
           {/* Next Prayer Countdown Card */}
           <Surface className="lg:col-span-5 p-6 space-y-4">
             <div className="space-y-1">
-              <p className="text-xs font-semibold text-primary">Next Prayer</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-primary">Next Prayer</p>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-muted tabular-nums">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  {formatCurrentTime(now, prefs.timeZone)}
+                </span>
+              </div>
               <h2 className="font-display text-3xl font-medium text-foreground">
                 {nextInfo.label} · {nextInfo.timeStr}
               </h2>

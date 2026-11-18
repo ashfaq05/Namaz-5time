@@ -20,10 +20,12 @@ import type {
 } from '../types/namaz';
 import {
   computeDailyPrayerTimes,
+  formatCurrentTime,
   formatGregorianDate,
   formatHijriDate,
   formatHourFloat,
   getNextPrayerCountdown,
+  getZonedDateParts,
 } from '../utils/astronomy';
 import { Button, IslamicPatternAccent, Surface } from './ui';
 
@@ -70,8 +72,10 @@ export function HomeDashboardView({
     prefs.location,
     prefs.calculationMethod,
     prefs.asrMethod,
+    prefs.timeZone,
   );
-  const nextPrayer = getNextPrayerCountdown(now, times);
+  const nextPrayer = getNextPrayerCountdown(now, times, prefs.timeZone);
+  const zonedNow = getZonedDateParts(now, prefs.timeZone);
   const madhhabInfo = MADHHAB_META[prefs.madhhab];
 
   // Screen 5: Select Prayer Type
@@ -157,7 +161,7 @@ export function HomeDashboardView({
     isha: times.isha,
   };
 
-  const hour = now.getHours();
+  const hour = zonedNow.hour;
   const greeting =
     hour < 12 ? 'As-salamu alaykum · Good Morning' : hour < 17 ? 'As-salamu alaykum · Good Afternoon' : 'As-salamu alaykum · Good Evening';
 
@@ -193,7 +197,11 @@ export function HomeDashboardView({
                 Learn. Listen. Pray.
               </h1>
               <p className="text-sm text-muted">
-                {formatGregorianDate(now)} · {formatHijriDate(now)} · {prefs.location.name}
+                {formatGregorianDate(now, prefs.timeZone)} · {formatHijriDate(now, prefs.timeZone)} ·{' '}
+                {prefs.location.name} ·{' '}
+                <strong className="text-foreground tabular-nums">
+                  {formatCurrentTime(now, prefs.timeZone)}
+                </strong>
               </p>
             </div>
 

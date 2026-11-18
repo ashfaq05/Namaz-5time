@@ -6,6 +6,8 @@ import {
   ChevronUp,
   Compass,
   Droplets,
+  Eye,
+  EyeOff,
   Maximize2,
   Minimize2,
   Pause,
@@ -38,7 +40,7 @@ import {
   stopSpeechPlayback,
   unlockAudioPlayback,
 } from '../utils/audioPlayer';
-import { useScreenWakeLock } from '../utils/wakeLock';
+import { primeScreenKeepAwake, useScreenWakeLock } from '../utils/wakeLock';
 import { Button, Surface, ToggleSwitch } from './ui';
 
 interface GuidedPrayerPlayerProps {
@@ -80,6 +82,9 @@ export function GuidedPrayerPlayer({
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [showMeaning, setShowMeaning] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(!startInPrep);
+  const [fsCameraControlsOpen, setFsCameraControlsOpen] = useState(false);
+  const [fsCameraOverride, setFsCameraOverride] = useState<CameraPreset | null>(null);
+  const [fsCameraResetNonce, setFsCameraResetNonce] = useState(0);
 
   const stageRef = useRef<HTMLDivElement | null>(null);
 
@@ -95,7 +100,7 @@ export function GuidedPrayerPlayer({
   const currentStep = steps[safeIdx];
 
   // Keep screen awake automatically throughout ongoing Namaz
-  const { locked: wakeLocked } = useScreenWakeLock(!inPrep && !sessionCompleted);
+  const { locked: wakeLocked, mode: wakeMode } = useScreenWakeLock(!inPrep && !sessionCompleted);
 
   const isPlayingRef = useRef(isPlaying);
   const repeatRef = useRef(repeatCurrent);
@@ -158,6 +163,11 @@ export function GuidedPrayerPlayer({
       onStepChange?.(currentStep.rakatNumber, safeIdx);
     }
   }, [inPrep, safeIdx, currentStep, onStepChange]);
+
+  // Clear manual camera override when step changes so each posture defaults to its recommended angle
+  useEffect(() => {
+    setFsCameraOverride(null);
+  }, [safeIdx]);
 
   // Trigger audio + recitation whenever playing a new step
   const triggerStepAudio = (
@@ -247,6 +257,7 @@ export function GuidedPrayerPlayer({
 
   const handleTogglePlay = () => {
     if (sessionCompleted) {
+      primeScreenKeepAwake();
       setSessionCompleted(false);
       setStepIdx(0);
       setSegmentElapsed(0);
@@ -259,12 +270,14 @@ export function GuidedPrayerPlayer({
       setIsPlaying(false);
       stopSpeechPlayback();
     } else {
+      primeScreenKeepAwake();
       setIsPlaying(true);
       if (currentStep) triggerStepAudio(currentStep);
     }
   };
 
   const handleReplayStep = () => {
+    primeScreenKeepAwake();
     setSegmentElapsed(0);
     setIsPlaying(true);
     if (currentStep) triggerStepAudio(currentStep);
@@ -484,6 +497,7 @@ export function GuidedPrayerPlayer({
             </p>
             <Button
               onClick={() => {
+                primeScreenKeepAwake();
                 setInPrep(false);
                 setIsPlaying(true);
                 setSegmentElapsed(0);
@@ -509,6 +523,7 @@ export function GuidedPrayerPlayer({
   );
   const segPct = Math.min(100, Math.round((segmentElapsed / currentStep.durationSec) * 100));
   const cameraPreset: CameraPreset = currentStep.activity.cameraHint;
+  const effectiveFsCameraPreset: CameraPreset = fsCameraOverride ?? cameraPreset;
 
   const voiceToggleControl = (
     <div
@@ -549,74 +564,138 @@ export function GuidedPrayerPlayer({
             theme={prefs.theme}
             quality={prefs.animationQuality}
             modelId={prefs.characterModel}
-            cameraPreset={cameraPreset}
+            cameraPreset={effectiveFsCameraPreset}
+            cameraResetNonce={fsCameraResetNonce}
             fullScreenMode
+            hideCameraDock
             className="h-full w-full"
           />
         </div>
 
-        {/* Top Floating HUD */}
-        <header className="relative z-10 pointer-events-none flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4">
-          <div className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-card border border-border/80 bg-surface/90 px-3.5 py-2 backdrop-blur-md shadow-sm">
-            <div>
-              <p className="text-[11px] font-medium text-muted">
-                {prayerInfo.name} · {config.categoryLabel} · {madhhabInfo.name}
-              </p>
-              <p className="text-sm font-semibold text-foreground tabular-nums">
-                Rakat {currentStep.rakatNumber} of {currentStep.totalRakats} · Step {safeIdx + 1}/
-                {steps.length}
-              </p>
+        {/* Top Floating HUD + In-Flow Camera Controls (never overlap on narrow mobile screens) */}
+        <div className="relative z-10 pointer-events-none flex flex-col gap-2 p-2.5 sm:p-4">
+          <header className="flex flex-wrap items-start justify-between gap-2">
+            <div className="pointer-events-auto flex flex-wrap items-center gap-2 sm:gap-3 rounded-card border border-border/80 bg-surface/90 px-3 py-2 backdrop-blur-md shadow-sm max-w-full">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted truncate">
+                  {prayerInfo.name} · {config.categoryLabel} · {madhhabInfo.name}
+                </p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums">
+                  Rakat {currentStep.rakatNumber} of {currentStep.totalRakats} · Step {safeIdx + 1}/
+                  {steps.length}
+                </p>
+              </div>
+
+              {!sessionCompleted && (
+                <span
+                  title="Screen stay-awake active while Namaz is ongoing"
+                  className="inline-flex items-center gap-1 rounded-control border border-primary/30 bg-surface-alt px-2 py-1 text-[11px] font-medium text-primary shrink-0"
+                >
+                  <Sun className="h-3 w-3" />
+                  {wakeLocked
+                    ? wakeMode === 'video_fallback'
+                      ? 'Screen Awake · Video Lock'
+                      : 'Screen Awake'
+                    : 'Keep-Awake On'}
+                </span>
+              )}
             </div>
 
-            {!sessionCompleted && (
-              <span
-                title="Screen stay-awake active while Namaz is ongoing"
-                className="inline-flex items-center gap-1 rounded-control border border-primary/30 bg-surface-alt px-2 py-1 text-[11px] font-medium text-primary"
+            <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <select
+                aria-label="3D character model"
+                value={prefs.characterModel}
+                onChange={(e) =>
+                  onUpdatePrefs({ characterModel: e.target.value as CharacterModelId })
+                }
+                className="min-h-9 max-w-[155px] sm:max-w-none truncate rounded-control border border-border/85 bg-surface/92 px-2.5 text-xs font-medium text-foreground backdrop-blur-md cursor-pointer"
               >
-                <Sun className="h-3 w-3" />
-                {wakeLocked ? 'Screen Awake' : 'Keep-Awake On'}
-              </span>
+                {CHARACTER_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+
+              {voiceToggleControl}
+
+              <button
+                type="button"
+                onClick={exitFullScreen}
+                className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-control border border-border/85 bg-surface/92 px-2.5 sm:px-3 text-xs font-medium text-foreground hover:bg-surface-alt backdrop-blur-md cursor-pointer"
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+                Minimize
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExitPlayer}
+                aria-label="Exit Prayer Session"
+                className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-control border border-border/85 bg-surface/92 px-2.5 sm:px-3 text-xs font-medium text-foreground hover:bg-surface-alt backdrop-blur-md cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+                Exit
+              </button>
+            </div>
+          </header>
+
+          {/* Collapsible Camera Controls placed cleanly below header in flow */}
+          <div className="flex flex-col items-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => setFsCameraControlsOpen((v) => !v)}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-surface/92 px-3 py-1 text-xs font-medium text-muted hover:text-foreground backdrop-blur-md cursor-pointer shadow-sm"
+            >
+              {fsCameraControlsOpen ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+              {fsCameraControlsOpen ? 'Hide Camera' : 'Camera'}
+            </button>
+
+            {fsCameraControlsOpen && (
+              <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5 rounded-card border border-border/85 bg-surface/92 px-2.5 py-1.5 backdrop-blur-md shadow-sm">
+                {(
+                  [
+                    { id: 'three_quarter', label: '3/4 Angle' },
+                    { id: 'front', label: 'Front View' },
+                    { id: 'side', label: 'Side Profile' },
+                  ] as const
+                ).map((btn) => (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => {
+                      setFsCameraOverride(btn.id);
+                      setFsCameraResetNonce((n) => n + 1);
+                    }}
+                    className={`min-h-8 whitespace-nowrap rounded-control px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                      effectiveFsCameraPreset === btn.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-foreground hover:bg-surface-alt'
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFsCameraOverride('three_quarter');
+                    setFsCameraResetNonce((n) => n + 1);
+                  }}
+                  title="Reset View"
+                  className="inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-control border border-border/80 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-surface-alt cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </button>
+              </div>
             )}
           </div>
-
-          <div className="pointer-events-auto flex flex-wrap items-center gap-2">
-            <select
-              aria-label="3D character model"
-              value={prefs.characterModel}
-              onChange={(e) =>
-                onUpdatePrefs({ characterModel: e.target.value as CharacterModelId })
-              }
-              className="min-h-9 rounded-control border border-border/85 bg-surface/92 px-2.5 text-xs font-medium text-foreground backdrop-blur-md cursor-pointer"
-            >
-              {CHARACTER_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-
-            {voiceToggleControl}
-
-            <button
-              type="button"
-              onClick={exitFullScreen}
-              className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-control border border-border/85 bg-surface/92 px-3 text-xs font-medium text-foreground hover:bg-surface-alt backdrop-blur-md cursor-pointer"
-            >
-              <Minimize2 className="h-3.5 w-3.5" />
-              Minimize
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExitPlayer}
-              aria-label="Exit Prayer Session"
-              className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-control border border-border/85 bg-surface/92 px-3 text-xs font-medium text-foreground hover:bg-surface-alt backdrop-blur-md cursor-pointer"
-            >
-              <X className="h-3.5 w-3.5" />
-              Exit
-            </button>
-          </div>
-        </header>
+        </div>
 
         {/* Bottom Floating Recitation & Transport HUD */}
         <footer className="relative z-10 pointer-events-none p-3 sm:p-4 flex justify-center">
@@ -796,7 +875,11 @@ export function GuidedPrayerPlayer({
                     <span>·</span>
                     <span className="inline-flex items-center gap-1 text-primary font-medium">
                       <Sun className="h-3 w-3" />
-                      {wakeLocked ? 'Screen Awake' : 'Keep-Awake On'}
+                      {wakeLocked
+                        ? wakeMode === 'video_fallback'
+                          ? 'Screen Awake · Video Lock'
+                          : 'Screen Awake'
+                        : 'Keep-Awake On'}
                     </span>
                   </>
                 )}

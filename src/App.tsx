@@ -655,6 +655,7 @@ export default function App() {
                 progress={progress}
                 recitationsMap={recitationsMap}
                 prayerConfigs={prayerConfigs}
+                timeZone={prefs.timeZone}
                 authUser={authUser}
                 signingIn={signingIn}
                 onSignIn={handleGoogleSignIn}

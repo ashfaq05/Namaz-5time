@@ -162,6 +162,7 @@ export async function ensureUserProfileAndProgress(
         characterModel: fallbackPrefs.characterModel,
         theme: fallbackPrefs.theme,
         hasCompletedSetup: fallbackPrefs.hasCompletedSetup,
+        timeZone: (fallbackPrefs.timeZone || 'auto').slice(0, 64),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -231,6 +232,7 @@ export async function syncUserPreferencesToFirestore(
       characterModel: prefs.characterModel,
       theme: prefs.theme,
       hasCompletedSetup: prefs.hasCompletedSetup,
+      timeZone: (prefs.timeZone || 'auto').slice(0, 64),
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
@@ -384,6 +386,9 @@ export function subscribeToUserAccount(
       }
       if (typeof d.hasCompletedSetup === 'boolean') {
         patch.hasCompletedSetup = d.hasCompletedSetup;
+      }
+      if (typeof d.timeZone === 'string' && d.timeZone.length >= 1 && d.timeZone.length <= 64) {
+        patch.timeZone = d.timeZone;
       }
       callbacks.onPrefsLoaded(patch);
     },

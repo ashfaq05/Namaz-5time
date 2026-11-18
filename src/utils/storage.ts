@@ -18,6 +18,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   madhhab: 'hanafi',
   learningLevel: 'beginner',
   location: PRESET_CITIES[0], // New Delhi
+  timeZone: 'auto',
   calculationMethod: 'karachi',
   asrMethod: 'hanafi',
   audioVolume: 0.85,
@@ -80,6 +81,10 @@ export function loadPreferences(uid?: string | null): UserPreferences {
     return {
       ...DEFAULT_PREFERENCES,
       ...parsed,
+      timeZone:
+        typeof parsed.timeZone === 'string' && parsed.timeZone.trim().length > 0
+          ? parsed.timeZone.trim()
+          : DEFAULT_PREFERENCES.timeZone,
       playbackSpeed: VALID_SPEEDS.includes(parsed.playbackSpeed as (typeof VALID_SPEEDS)[number])
         ? (parsed.playbackSpeed as UserPreferences['playbackSpeed'])
         : DEFAULT_PREFERENCES.playbackSpeed,
