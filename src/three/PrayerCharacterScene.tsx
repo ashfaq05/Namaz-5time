@@ -73,6 +73,7 @@ interface JointTargets {
 }
 
 const _box = new THREE.Box3();
+const _childBox = new THREE.Box3();
 const _size = new THREE.Vector3();
 
 function detectSoftwareGl(): boolean {
@@ -145,19 +146,25 @@ function getPoseTargets(pose: PoseId, madhhab: MadhhabId): JointTargets {
     return {
       ...standing,
       headX: -0.14,
-      lShoulderX: isHanafi ? 1.48 : 1.18,
-      lShoulderY: -0.12,
-      lShoulderZ: -0.45,
-      lElbowX: 1.58,
-      lForearmY: 1.42, // Turn left palm forward toward Qibla (-Z)
-      lWristX: -0.1,
+      lShoulderX: isHanafi ? 1.46 : 1.0,
+      lShoulderY: isHanafi ? -1.18 : -0.56,
+      lShoulderZ: isHanafi ? -1.04 : -0.62,
+      lElbowX: isHanafi ? 2.65 : 2.4,
+      lForearmY: isHanafi ? -1.28 : -1.28, // Turn left palm forward toward Qibla (-Z), thumb medial by left ear
+      lWristX: isHanafi ? -0.04 : -0.28,
+      lWristZ: isHanafi ? 0.58 : 0.18,
 
-      rShoulderX: isHanafi ? 1.48 : 1.18,
-      rShoulderY: 0.12,
-      rShoulderZ: 0.45,
-      rElbowX: 1.58,
-      rForearmY: -1.42, // Turn right palm forward toward Qibla (-Z)
-      rWristX: -0.1,
+      rShoulderX: isHanafi ? 1.46 : 1.0,
+      rShoulderY: isHanafi ? 1.18 : 0.56,
+      rShoulderZ: isHanafi ? 1.04 : 0.62,
+      rElbowX: isHanafi ? 2.65 : 2.4,
+      rForearmY: isHanafi ? 1.28 : 1.28, // Turn right palm forward toward Qibla (-Z), thumb medial by right ear
+      rWristX: isHanafi ? -0.04 : -0.28,
+      rWristZ: isHanafi ? -0.58 : -0.18,
+
+      rFingersCurl: 0.04,
+      rIndexCurl: 0.04,
+      lFingersCurl: 0.04,
     };
   }
 
@@ -288,40 +295,40 @@ function getPoseTargets(pose: PoseId, madhhab: MadhhabId): JointTargets {
       headY: yaw,
 
       // Hands rest naturally on top of the thighs near the knees
-      lShoulderX: 0.2,
+      lShoulderX: 0.22,
       lShoulderY: -0.1,
       lShoulderZ: -0.08,
-      lElbowX: 0.65,
+      lElbowX: 0.72,
       lForearmY: 1.35, // Left palm flat down on left thigh
-      lWristX: 0.38,
+      lWristX: 0.34,
 
-      rShoulderX: 0.2,
+      rShoulderX: 0.22,
       rShoulderY: 0.1,
       rShoulderZ: 0.08,
-      rElbowX: 0.65,
+      rElbowX: 0.72,
       rForearmY: isTashahhud ? -0.35 : -1.35, // In Tashahhud thumb/middle ring upright; else flat on right thigh
-      rWristX: isTashahhud ? 0.2 : 0.38,
+      rWristX: isTashahhud ? 0.2 : 0.34,
 
       rFingersCurl: isTashahhud ? 1.35 : 0.18, // Middle/ring/pinky curled in Tashahhud
       rIndexCurl: isTashahhud ? -0.12 : 0.18, // Right index finger raised & pointing in Tashahhud
       lFingersCurl: 0.15,
 
-      // Knees grounded on mat (y ≈ -0.225); shins angle gently up to tucked left foot & upright right foot on curled toes
-      lHipX: 1.28, // Thigh world = +1.24 rad
+      // Knees, shins, and feet grounded flush onto prayer mat (y ≈ -0.185)
+      lHipX: 1.38, // Thigh world = +1.34 rad
       lHipZ: isTawarruk ? -0.12 : -0.05,
-      lKneeX: -2.94, // Shin world = -1.70 rad
-      lAnkleX: -1.45, // Left foot lies flat under body (Iftirash)
+      lKneeX: -2.88, // Shin world = -1.54 rad (resting cleanly along mat)
+      lAnkleX: -1.55, // Left foot lies flat under body (Iftirash)
       lAnkleY: isTawarruk ? -0.82 : -0.45, // Tucked inward under pelvis / across in Tawarruk
-      lAnkleZ: -0.18,
-      lToesX: 0.15,
+      lAnkleZ: -0.16,
+      lToesX: 0.12,
 
-      rHipX: 1.28,
+      rHipX: 1.38,
       rHipZ: 0.05,
-      rKneeX: -2.94,
-      rAnkleX: -0.2, // Right foot stays upright on curled toes facing Qibla
+      rKneeX: -2.88,
+      rAnkleX: -0.18, // Right foot stays upright on curled toes facing Qibla
       rAnkleY: 0,
       rAnkleZ: 0,
-      rToesX: 1.45,
+      rToesX: 1.5,
     };
   }
 
@@ -755,11 +762,6 @@ export function PrayerCharacterScene({
     const irisMat = new THREE.MeshStandardMaterial({
       color: 0x1e1410,
       roughness: 0.12,
-      metalness: 0.05,
-    });
-    const sandalMat = new THREE.MeshStandardMaterial({
-      color: isEmbroidered ? 0x454549 : isGulfGhutra ? 0x5c3a24 : 0x4b4036,
-      roughness: 0.72,
       metalness: 0.05,
     });
 
@@ -1230,17 +1232,6 @@ export function PrayerCharacterScene({
       footMesh.castShadow = true;
       ankle.add(footMesh);
 
-      // Subtle sandal / strap accents matching reference images while keeping toes clean
-      if (isEmbroidered || isGulfGhutra) {
-        const strap = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.02, 0.045), sandalMat);
-        strap.position.set(0, -0.008, -0.06);
-        ankle.add(strap);
-
-        const sole = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.012, 0.175), sandalMat);
-        sole.position.set(0, -0.046, -0.062);
-        ankle.add(sole);
-      }
-
       const toes = new THREE.Group();
       toes.position.set(0, -0.024, -0.116);
       ankle.add(toes);
@@ -1309,12 +1300,36 @@ export function PrayerCharacterScene({
       rightLeg.ankle.rotation.set(j.rAnkleX, j.rAnkleY, j.rAnkleZ);
       rightLeg.toes.rotation.x = j.rToesX;
 
-      // Show flowing lower thobe skirt when upright or bowing; hide when seated/prostrating so knees/shins read cleanly
-      skirtMesh.visible = j.lHipX < 1.7 && j.lKneeX > -1.0;
+      // Show flowing lower thobe skirt when upright or bowing; collapse scale when seated/prostrating
+      // so Box3 bounds (used by floor snap & camera framing) never include the hidden skirt!
+      const showSkirt = j.lHipX < 0.9 && j.lKneeX > -0.7;
+      skirtMesh.visible = showSkirt;
+      skirtMesh.scale.setScalar(showSkirt ? 1 : 0.0001);
 
       // Keep character centered nicely on prayer mat and snapped flush to mat top surface (y = 0.02)
       character.updateMatrixWorld(true);
-      _box.setFromObject(character);
+      _box.makeEmpty();
+      character.traverse((obj) => {
+        if (obj instanceof THREE.Mesh && obj.visible) {
+          let p: THREE.Object3D | null = obj.parent;
+          let allVisible = true;
+          while (p) {
+            if (!p.visible) {
+              allVisible = false;
+              break;
+            }
+            p = p.parent;
+          }
+          if (allVisible && obj.geometry) {
+            obj.geometry.computeBoundingBox();
+            if (obj.geometry.boundingBox) {
+              _childBox.copy(obj.geometry.boundingBox).applyMatrix4(obj.matrixWorld);
+              _box.union(_childBox);
+            }
+          }
+        }
+      });
+
       if (Number.isFinite(_box.min.y)) {
         character.position.y += 0.02 - _box.min.y;
       }
