@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(0.96 0.014 85);
+  --color-surface: oklch(0.992 0.007 85);
+  --color-surface-alt: oklch(0.935 0.018 85);
+  --color-foreground: oklch(0.22 0.03 190);
+  --color-muted: oklch(0.45 0.025 180);
+  --color-border: oklch(0.84 0.02 85);
+  --color-primary: oklch(0.38 0.095 162);
+  --color-primary-foreground: oklch(0.985 0.008 90);
+  --color-accent: oklch(0.60 0.115 76);
+  --color-accent-foreground: oklch(0.20 0.03 70);
+  --color-success: oklch(0.43 0.11 155);
+  --color-warning: oklch(0.58 0.12 72);
+
+  --font-sans: "Instrument Sans", system-ui, sans-serif;
+  --font-display: "Newsreader", Georgia, serif;
+  --font-arabic: "Amiri", "Noto Naskh Arabic", serif;
+  --font-urdu: "Noto Naskh Arabic", "Amiri", serif;
+  --font-hindi: "Noto Sans Devanagari", "Instrument Sans", sans-serif;
+
+  --text-display: clamp(1.75rem, 1.3rem + 1.1vw, 2.35rem);
+  --text-display--line-height: 1.12;
+  --text-display--font-weight: 500;
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+  --shadow-surface: 0 1px 2px oklch(0.22 0.03 190 / 0.04);
+}
+
+:root[data-theme="dark"] {
+  --color-background: oklch(0.16 0.018 190);
+  --color-surface: oklch(0.21 0.02 188);
+  --color-surface-alt: oklch(0.25 0.022 186);
+  --color-foreground: oklch(0.93 0.012 85);
+  --color-muted: oklch(0.73 0.018 150);
+  --color-border: oklch(0.32 0.022 185);
+  --color-primary: oklch(0.56 0.11 162);
+  --color-primary-foreground: oklch(0.13 0.02 185);
+  --color-accent: oklch(0.74 0.11 80);
+  --color-accent-foreground: oklch(0.16 0.02 75);
+  --color-success: oklch(0.62 0.12 155);
+  --color-warning: oklch(0.74 0.12 75);
+  --shadow-surface: 0 1px 3px oklch(0.08 0.01 190 / 0.28);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-synthesis-weight: none;
+  scroll-behavior: smooth;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-arabic {
+  font-family: var(--font-arabic);
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.font-urdu {
+  font-family: var(--font-urdu);
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.font-hindi {
+  font-family: var(--font-hindi);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin):not(.animate-pulse),
+  *:not(.animate-spin):not(.animate-pulse)::before,
+  *:not(.animate-spin):not(.animate-pulse)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

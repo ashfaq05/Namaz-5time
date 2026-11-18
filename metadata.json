@@ -1,0 +1,6 @@
+{
+  "name": "Namaz Companion",
+  "description": "A visual and audio learning companion for the five daily prayers with synchronized 3D demonstrations, verified recitations, and Hanafi, Shafi'i, Maliki, and Hanbali guidance in Arabic, English, Hindi, and Urdu.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
