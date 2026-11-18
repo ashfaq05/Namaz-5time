@@ -244,6 +244,7 @@ export function HomeDashboardView({
               madhhab={prefs.madhhab}
               theme={prefs.theme}
               quality={prefs.animationQuality}
+              modelId={prefs.characterModel}
               compact
               className="h-[270px] sm:h-[310px]"
               caption={`Qiyam Posture · ${madhhabInfo.name}`}

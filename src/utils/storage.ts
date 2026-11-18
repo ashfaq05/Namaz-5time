@@ -26,6 +26,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   spokenInstructionsEnabled: false,
   autoAdvanceEnabled: true,
   animationQuality: 'high',
+  characterModel: 'embroidered_thobe',
   theme: 'light',
   arabicTextScale: 'normal',
   notifications: {
@@ -61,6 +62,7 @@ export const DEFAULT_PROGRESS: LearningProgressState = {
 };
 
 const VALID_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25] as const;
+const VALID_MODELS = ['embroidered_thobe', 'gulf_ghutra', 'classic_emerald'] as const;
 
 export function loadPreferences(): UserPreferences {
   try {
@@ -73,6 +75,9 @@ export function loadPreferences(): UserPreferences {
       playbackSpeed: VALID_SPEEDS.includes(parsed.playbackSpeed as (typeof VALID_SPEEDS)[number])
         ? (parsed.playbackSpeed as UserPreferences['playbackSpeed'])
         : DEFAULT_PREFERENCES.playbackSpeed,
+      characterModel: VALID_MODELS.includes(parsed.characterModel as (typeof VALID_MODELS)[number])
+        ? (parsed.characterModel as UserPreferences['characterModel'])
+        : DEFAULT_PREFERENCES.characterModel,
       voiceGender: parsed.voiceGender === 'female' ? 'female' : 'male',
       notifications: {
         ...DEFAULT_PREFERENCES.notifications,

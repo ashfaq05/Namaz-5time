@@ -6,6 +6,8 @@ export type VoiceGender = 'male' | 'female';
 
 export type PlaybackSpeed = 0.25 | 0.5 | 0.75 | 1 | 1.25;
 
+export type CharacterModelId = 'embroidered_thobe' | 'gulf_ghutra' | 'classic_emerald';
+
 export type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
 
 export type PrayerId = 'fajr' | 'zuhr' | 'asr' | 'maghrib' | 'isha';
@@ -139,6 +141,7 @@ export interface UserPreferences {
   spokenInstructionsEnabled: boolean;
   autoAdvanceEnabled: boolean;
   animationQuality: 'standard' | 'high';
+  characterModel: CharacterModelId;
   theme: 'light' | 'dark';
   arabicTextScale: 'normal' | 'large';
   notifications: Record<PrayerId, boolean>;

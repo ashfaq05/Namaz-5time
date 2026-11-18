@@ -1,21 +1,24 @@
 import { useState } from 'react';
 import { CheckCircle2, Play, RotateCcw } from 'lucide-react';
 import { MOVEMENT_LESSONS } from '../data/activities';
+import { CHARACTER_MODELS } from '../data/models';
 import { MADHHAB_META } from '../data/prayers';
 import { PrayerCharacterScene } from '../three/PrayerCharacterScene';
-import type { MadhhabId, PoseId, UserPreferences } from '../types/namaz';
+import type { CharacterModelId, MadhhabId, PoseId, UserPreferences } from '../types/namaz';
 import { playGentleTransitionChime, speakGuidanceAndRecitation } from '../utils/audioPlayer';
 import { Button, Surface } from './ui';
 
 interface MovementsLibraryViewProps {
   prefs: UserPreferences;
   learnedMovements: PoseId[];
+  onUpdatePrefs?: (patch: Partial<UserPreferences>) => void;
   onMarkLearned: (pose: PoseId) => void;
 }
 
 export function MovementsLibraryView({
   prefs,
   learnedMovements,
+  onUpdatePrefs,
   onMarkLearned,
 }: MovementsLibraryViewProps) {
   const [selectedPose, setSelectedPose] = useState<PoseId>('takbir');
@@ -59,22 +62,40 @@ export function MovementsLibraryView({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted mr-1">Preview School:</span>
-          {(['hanafi', 'shafii', 'maliki', 'hanbali'] as MadhhabId[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setPreviewMadhhab(m)}
-              className={`min-h-9 rounded-control border px-3 text-xs font-medium cursor-pointer ${
-                previewMadhhab === m
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-surface text-foreground border-border hover:bg-surface-alt'
-              }`}
+        <div className="flex flex-wrap items-center gap-2">
+          {onUpdatePrefs && (
+            <select
+              aria-label="3D character model"
+              value={prefs.characterModel}
+              onChange={(e) =>
+                onUpdatePrefs({ characterModel: e.target.value as CharacterModelId })
+              }
+              className="min-h-9 rounded-control border border-border bg-surface px-2.5 text-xs font-medium text-foreground cursor-pointer"
             >
-              {MADHHAB_META[m].name}
-            </button>
-          ))}
+              {CHARACTER_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  Model: {m.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted mr-1">Preview School:</span>
+            {(['hanafi', 'shafii', 'maliki', 'hanbali'] as MadhhabId[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setPreviewMadhhab(m)}
+                className={`min-h-9 rounded-control border px-3 text-xs font-medium cursor-pointer ${
+                  previewMadhhab === m
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-surface text-foreground border-border hover:bg-surface-alt'
+                }`}
+              >
+                {MADHHAB_META[m].name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -112,6 +133,7 @@ export function MovementsLibraryView({
             madhhab={previewMadhhab}
             theme={prefs.theme}
             quality={prefs.animationQuality}
+            modelId={prefs.characterModel}
             cameraPreset={active.cameraHint}
             className="h-[380px] sm:h-[450px] lg:h-[500px]"
             caption={`${active.arabicTitle} · ${MADHHAB_META[previewMadhhab].name} Posture`}

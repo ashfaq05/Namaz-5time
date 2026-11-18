@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Eye, EyeOff, RotateCcw } from 'lucide-react';
-import type { MadhhabId, PoseId } from '../types/namaz';
+import type { CharacterModelId, MadhhabId, PoseId } from '../types/namaz';
 
 export type CameraPreset = 'three_quarter' | 'front' | 'side';
 
@@ -12,6 +12,7 @@ interface PrayerCharacterSceneProps {
   madhhab: MadhhabId;
   theme: 'light' | 'dark';
   quality?: 'standard' | 'high';
+  modelId?: CharacterModelId;
   cameraPreset?: CameraPreset;
   className?: string;
   compact?: boolean;
@@ -394,6 +395,46 @@ function createPrayerMatTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+function createEmbroideryTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 256;
+  const g = c.getContext('2d');
+  if (g) {
+    g.fillStyle = '#e5ded0';
+    g.fillRect(0, 0, 128, 256);
+
+    // Subtle vertical woven borders
+    g.fillStyle = '#c8bda4';
+    g.fillRect(4, 0, 6, 256);
+    g.fillRect(118, 0, 6, 256);
+
+    // Repeating geometric diamond / arabesque embroidery weave
+    g.strokeStyle = '#b4a586';
+    g.lineWidth = 3;
+    for (let y = 16; y < 256; y += 32) {
+      g.beginPath();
+      g.moveTo(64, y - 12);
+      g.lineTo(98, y);
+      g.lineTo(64, y + 12);
+      g.lineTo(30, y);
+      g.closePath();
+      g.stroke();
+
+      g.fillStyle = '#f5f0e4';
+      g.beginPath();
+      g.arc(64, y, 4.5, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 3);
+  return tex;
+}
+
 function createContactShadowTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 128;
@@ -492,6 +533,7 @@ export function PrayerCharacterScene({
   madhhab,
   theme,
   quality = 'high',
+  modelId = 'embroidered_thobe',
   cameraPreset = 'three_quarter',
   className = '',
   compact = false,
@@ -657,41 +699,68 @@ export function PrayerCharacterScene({
     contactShadow.renderOrder = 2;
     scene.add(contactShadow);
 
-    // Character Materials
+    const activeModel: CharacterModelId = modelId;
+    const isEmbroidered = activeModel === 'embroidered_thobe';
+    const isGulfGhutra = activeModel === 'gulf_ghutra';
+
+    // Character Materials calibrated to selected 3D model
+    const embroideryTex = createEmbroideryTexture();
+
     const skinMat = new THREE.MeshStandardMaterial({
-      color: 0xc99672,
-      roughness: 0.56,
+      color: isGulfGhutra ? 0xdfa27e : isEmbroidered ? 0xd2976f : 0xc99672,
+      roughness: isGulfGhutra ? 0.52 : 0.48,
       metalness: 0.02,
     });
     const thobeMat = new THREE.MeshStandardMaterial({
-      color: 0xf4efe4,
-      roughness: 0.84,
+      color: isEmbroidered ? 0xf7f8fa : isGulfGhutra ? 0xf6f7fa : 0xf4efe4,
+      roughness: isGulfGhutra ? 0.86 : 0.78,
       metalness: 0.0,
     });
     const trimMat = new THREE.MeshStandardMaterial({
-      color: 0x205946,
-      roughness: 0.65,
-      metalness: 0.05,
+      color: isEmbroidered ? 0xdcd4c2 : isGulfGhutra ? 0xe4e7ec : 0x205946,
+      roughness: 0.62,
+      metalness: isEmbroidered ? 0.14 : 0.04,
+    });
+    const embroideryMat = new THREE.MeshStandardMaterial({
+      map: embroideryTex,
+      color: 0xf4efe4,
+      roughness: 0.6,
+      metalness: 0.14,
     });
     const capMat = new THREE.MeshStandardMaterial({
-      color: 0xfbf9f4,
-      roughness: 0.72,
-      metalness: 0.02,
+      color: 0xfafafa,
+      roughness: 0.74,
+      metalness: 0.01,
     });
     const trouserMat = new THREE.MeshStandardMaterial({
-      color: 0xe6dfd0,
-      roughness: 0.88,
+      color: isEmbroidered ? 0x4b4f56 : isGulfGhutra ? 0xebedf2 : 0xe6dfd0,
+      roughness: 0.86,
       metalness: 0.0,
     });
     const brassMat = new THREE.MeshStandardMaterial({
-      color: 0xc8a45d,
-      roughness: 0.32,
-      metalness: 0.72,
+      color: isEmbroidered ? 0xd3c49d : 0xc8a45d,
+      roughness: 0.28,
+      metalness: 0.68,
     });
     const hairMat = new THREE.MeshStandardMaterial({
-      color: 0x2c2420,
-      roughness: 0.9,
+      color: isGulfGhutra ? 0x1b1715 : 0x241d19,
+      roughness: 0.88,
       metalness: 0.0,
+    });
+    const eyeWhiteMat = new THREE.MeshStandardMaterial({
+      color: 0xfcfcfc,
+      roughness: 0.2,
+      metalness: 0.0,
+    });
+    const irisMat = new THREE.MeshStandardMaterial({
+      color: 0x1e1410,
+      roughness: 0.12,
+      metalness: 0.05,
+    });
+    const sandalMat = new THREE.MeshStandardMaterial({
+      color: isEmbroidered ? 0x454549 : isGulfGhutra ? 0x5c3a24 : 0x4b4036,
+      roughness: 0.72,
+      metalness: 0.05,
     });
 
     // Articulated Character Hierarchy
@@ -701,33 +770,139 @@ export function PrayerCharacterScene({
     const pelvis = new THREE.Group();
     character.add(pelvis);
 
-    const pelvisMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.158, 0.15, 20), thobeMat);
+    const pelvisMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.142, 0.16, 0.15, 22),
+      thobeMat,
+    );
     pelvisMesh.castShadow = true;
     pelvis.add(pelvisMesh);
 
-    const beltMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.143, 0.145, 0.04, 20), trimMat);
-    beltMesh.position.y = 0.055;
-    pelvis.add(beltMesh);
+    if (!isEmbroidered && !isGulfGhutra) {
+      const beltMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.143, 0.145, 0.04, 20), trimMat);
+      beltMesh.position.y = 0.055;
+      pelvis.add(beltMesh);
+    }
 
     const torso = new THREE.Group();
     torso.position.y = 0.075;
     pelvis.add(torso);
 
-    const chestMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.172, 0.14, 0.41, 20), thobeMat);
+    const chestMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.172, 0.142, 0.41, 22),
+      thobeMat,
+    );
     chestMesh.position.y = 0.205;
     chestMesh.castShadow = true;
     torso.add(chestMesh);
 
-    const placketMesh = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.22, 0.02), trimMat);
-    placketMesh.position.set(0, 0.285, -0.152);
-    torso.add(placketMesh);
+    // Front chest placket & model-specific garment ornamentation
+    if (isEmbroidered) {
+      // Ornate gold-beige embroidered central placket with pointed bottom tip & two medallion buttons
+      const placketMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.052, 0.21, 0.018),
+        embroideryMat,
+      );
+      placketMesh.position.set(0, 0.295, -0.156);
+      torso.add(placketMesh);
 
-    const collarRing = new THREE.Mesh(new THREE.TorusGeometry(0.076, 0.014, 10, 20), brassMat);
-    collarRing.rotation.x = Math.PI / 2;
-    collarRing.position.y = 0.415;
-    torso.add(collarRing);
+      const placketTip = new THREE.Mesh(
+        new THREE.ConeGeometry(0.036, 0.044, 4),
+        embroideryMat,
+      );
+      placketTip.rotation.z = Math.PI;
+      placketTip.rotation.y = Math.PI / 4;
+      placketTip.scale.set(1, 1, 0.32);
+      placketTip.position.set(0, 0.172, -0.156);
+      torso.add(placketTip);
 
-    // Neck + Head + Kufi Cap
+      const topButton = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 12), brassMat);
+      topButton.scale.set(1, 1, 0.65);
+      topButton.position.set(0, 0.355, -0.167);
+      torso.add(topButton);
+
+      const medallion = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.01, 16), brassMat);
+      medallion.rotation.x = Math.PI / 2;
+      medallion.position.set(0, 0.23, -0.166);
+      torso.add(medallion);
+
+      // Stand-up embroidered Mandarin collar
+      const standCollar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.082, 0.088, 0.036, 20),
+        thobeMat,
+      );
+      standCollar.position.y = 0.422;
+      torso.add(standCollar);
+
+      const collarTrim = new THREE.Mesh(new THREE.TorusGeometry(0.083, 0.007, 10, 22), trimMat);
+      collarTrim.rotation.x = Math.PI / 2;
+      collarTrim.position.y = 0.436;
+      torso.add(collarTrim);
+
+      // Twin flowing gold-beige embroidered shoulder stoles + bottom beads & tassels
+      ([-1, 1] as const).forEach((side) => {
+        const stoleChest = new THREE.Mesh(
+          new THREE.BoxGeometry(0.042, 0.36, 0.02),
+          embroideryMat,
+        );
+        stoleChest.position.set(side * 0.088, 0.235, -0.152);
+        stoleChest.rotation.z = side * -0.05;
+        stoleChest.rotation.x = -0.06;
+        stoleChest.castShadow = true;
+        torso.add(stoleChest);
+
+        const stoleShoulder = new THREE.Mesh(
+          new THREE.BoxGeometry(0.044, 0.022, 0.16),
+          embroideryMat,
+        );
+        stoleShoulder.position.set(side * 0.095, 0.408, -0.07);
+        torso.add(stoleShoulder);
+
+        const stoleLower = new THREE.Mesh(
+          new THREE.BoxGeometry(0.042, 0.17, 0.02),
+          embroideryMat,
+        );
+        stoleLower.position.set(side * 0.088, -0.01, -0.153);
+        pelvis.add(stoleLower);
+
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(0.013, 12, 12), brassMat);
+        bead.position.set(side * 0.088, -0.104, -0.155);
+        pelvis.add(bead);
+
+        const tassel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.006, 0.012, 0.038, 10),
+          trimMat,
+        );
+        tassel.position.set(side * 0.088, -0.132, -0.155);
+        pelvis.add(tassel);
+      });
+    } else if (isGulfGhutra) {
+      // Minimalist crisp Gulf thobe front vertical seam + clean high collar
+      const centerSeam = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.39, 0.014), trimMat);
+      centerSeam.position.set(0, 0.205, -0.156);
+      torso.add(centerSeam);
+
+      const lowerSeam = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.15, 0.014), trimMat);
+      lowerSeam.position.set(0, 0.0, -0.152);
+      pelvis.add(lowerSeam);
+
+      const gulfCollar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.078, 0.084, 0.038, 20),
+        thobeMat,
+      );
+      gulfCollar.position.y = 0.422;
+      torso.add(gulfCollar);
+    } else {
+      const placketMesh = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.22, 0.02), trimMat);
+      placketMesh.position.set(0, 0.285, -0.152);
+      torso.add(placketMesh);
+
+      const collarRing = new THREE.Mesh(new THREE.TorusGeometry(0.076, 0.014, 10, 20), brassMat);
+      collarRing.rotation.x = Math.PI / 2;
+      collarRing.position.y = 0.415;
+      torso.add(collarRing);
+    }
+
+    // Neck + Head + Stylized Facial Features + Model Headwear
     const neck = new THREE.Group();
     neck.position.y = 0.425;
     torso.add(neck);
@@ -741,40 +916,187 @@ export function PrayerCharacterScene({
     head.position.y = 0.125;
     neck.add(head);
 
-    const skullMesh = new THREE.Mesh(new THREE.SphereGeometry(0.108, 24, 20), skinMat);
-    skullMesh.scale.set(0.92, 1.07, 0.98);
+    const skullMesh = new THREE.Mesh(new THREE.SphereGeometry(0.108, 28, 22), skinMat);
+    skullMesh.scale.set(0.92, 1.08, 0.97);
     skullMesh.castShadow = true;
     head.add(skullMesh);
 
-    const noseMesh = new THREE.Mesh(new THREE.ConeGeometry(0.017, 0.042, 10), skinMat);
-    noseMesh.rotation.x = -Math.PI / 2;
-    noseMesh.position.set(0, -0.005, -0.108);
+    // Sculpted Ears
+    ([-1, 1] as const).forEach((side) => {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), skinMat);
+      ear.scale.set(0.55, 1.15, 0.78);
+      ear.position.set(side * 0.098, -0.002, 0.006);
+      head.add(ear);
+    });
+
+    // Nose (rounded friendly stylized nose)
+    const noseMesh = new THREE.Mesh(new THREE.SphereGeometry(0.017, 14, 14), skinMat);
+    noseMesh.scale.set(0.95, 1.25, 1.2);
+    noseMesh.position.set(0, -0.006, -0.105);
     head.add(noseMesh);
 
-    // Subtle brow & eyes so gaze direction reads cleanly
-    const browMesh = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.012, 0.014), hairMat);
-    browMesh.position.set(0, 0.025, -0.096);
-    head.add(browMesh);
+    // Expressive Stylized Eyes & Eyebrows
+    ([-1, 1] as const).forEach((side) => {
+      if (isGulfGhutra) {
+        const dotEye = new THREE.Mesh(new THREE.SphereGeometry(0.011, 12, 12), irisMat);
+        dotEye.position.set(side * 0.034, 0.018, -0.096);
+        head.add(dotEye);
 
-    const beardMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.095, 18, 14, 0, Math.PI * 2, Math.PI * 0.48, Math.PI * 0.5),
-      hairMat,
-    );
-    beardMesh.position.set(0, -0.024, -0.015);
-    head.add(beardMesh);
+        const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0038, 8, 8), eyeWhiteMat);
+        glint.position.set(side * 0.031, 0.022, -0.105);
+        head.add(glint);
+      } else {
+        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.016, 14, 14), eyeWhiteMat);
+        sclera.scale.set(1.05, 0.85, 0.65);
+        sclera.position.set(side * 0.035, 0.017, -0.094);
+        head.add(sclera);
 
-    const kufiMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.101, 0.106, 0.072, 24),
-      capMat,
-    );
-    kufiMesh.position.y = 0.066;
-    kufiMesh.castShadow = true;
-    head.add(kufiMesh);
+        const iris = new THREE.Mesh(new THREE.SphereGeometry(0.011, 12, 12), irisMat);
+        iris.scale.set(1, 1, 0.65);
+        iris.position.set(side * 0.035, 0.017, -0.101);
+        head.add(iris);
 
-    const kufiBand = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.009, 10, 24), trimMat);
-    kufiBand.rotation.x = Math.PI / 2;
-    kufiBand.position.y = 0.034;
-    head.add(kufiBand);
+        const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 8, 8), eyeWhiteMat);
+        glint.position.set(side * 0.032, 0.021, -0.106);
+        head.add(glint);
+      }
+
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.009, 0.012), hairMat);
+      brow.position.set(side * 0.035, 0.041, -0.096);
+      brow.rotation.z = side * -0.08;
+      head.add(brow);
+    });
+
+    // Warm Smile
+    if (isGulfGhutra) {
+      const smile = new THREE.Mesh(
+        new THREE.TorusGeometry(0.024, 0.006, 10, 18, Math.PI * 0.8),
+        eyeWhiteMat,
+      );
+      smile.rotation.x = Math.PI;
+      smile.rotation.z = Math.PI * 0.1;
+      smile.position.set(0, -0.032, -0.098);
+      head.add(smile);
+    }
+
+    // Groomed Beard + Hairline
+    if (isEmbroidered) {
+      // Sculpted jawline beard & neat mustache matching Image 1
+      const jawBeard = new THREE.Mesh(
+        new THREE.SphereGeometry(0.098, 22, 16, 0, Math.PI * 2, Math.PI * 0.56, Math.PI * 0.42),
+        hairMat,
+      );
+      jawBeard.scale.set(0.95, 1.06, 0.99);
+      jawBeard.position.set(0, -0.022, -0.012);
+      head.add(jawBeard);
+
+      const chinTuft = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.032, 0.026), hairMat);
+      chinTuft.position.set(0, -0.072, -0.082);
+      head.add(chinTuft);
+
+      const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.01, 0.016), hairMat);
+      mustache.position.set(0, -0.032, -0.098);
+      head.add(mustache);
+
+      const sideHair = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.099, 0.1, 0.036, 22, 1, false, Math.PI * 0.25, Math.PI * 1.5),
+        hairMat,
+      );
+      sideHair.position.set(0, 0.028, 0.005);
+      head.add(sideHair);
+    } else if (isGulfGhutra) {
+      // Full rounded dark beard framing the smile matching Image 2
+      const fullBeard = new THREE.Mesh(
+        new THREE.SphereGeometry(0.104, 22, 16, 0, Math.PI * 2, Math.PI * 0.52, Math.PI * 0.48),
+        hairMat,
+      );
+      fullBeard.scale.set(0.96, 1.08, 1.01);
+      fullBeard.position.set(0, -0.024, -0.01);
+      head.add(fullBeard);
+
+      const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.012, 0.018), hairMat);
+      mustache.position.set(0, -0.026, -0.098);
+      head.add(mustache);
+    } else {
+      const beardMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.095, 18, 14, 0, Math.PI * 2, Math.PI * 0.48, Math.PI * 0.5),
+        hairMat,
+      );
+      beardMesh.position.set(0, -0.024, -0.015);
+      head.add(beardMesh);
+    }
+
+    // Headwear per selected model
+    if (isGulfGhutra) {
+      // White Ghutra headscarf + plump white rolled headband + back/side shoulder drape
+      const ghutraCrown = new THREE.Mesh(
+        new THREE.SphereGeometry(0.111, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+        capMat,
+      );
+      ghutraCrown.scale.set(0.95, 1.02, 1.0);
+      ghutraCrown.position.y = 0.036;
+      ghutraCrown.castShadow = true;
+      head.add(ghutraCrown);
+
+      const headband = new THREE.Mesh(
+        new THREE.TorusGeometry(0.109, 0.021, 14, 28),
+        new THREE.MeshStandardMaterial({
+          color: 0xeff1f5,
+          roughness: 0.72,
+          metalness: 0.02,
+        }),
+      );
+      headband.rotation.x = Math.PI / 2 - 0.14;
+      headband.position.set(0, 0.068, 0.008);
+      headband.castShadow = true;
+      head.add(headband);
+
+      const ghutraMat = new THREE.MeshStandardMaterial({
+        color: 0xf6f7fa,
+        roughness: 0.84,
+        side: THREE.DoubleSide,
+      });
+      // Flowing drape around sides & back of head (+Z), keeping face (-Z) open
+      const ghutraDrape = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          0.114,
+          0.165,
+          0.25,
+          24,
+          1,
+          true,
+          -Math.PI * 0.65,
+          Math.PI * 1.3,
+        ),
+        ghutraMat,
+      );
+      ghutraDrape.position.set(0, -0.045, 0.018);
+      ghutraDrape.castShadow = true;
+      head.add(ghutraDrape);
+    } else {
+      // Rounded embroidered Kufi cap matching Image 1 (and Classic Emerald)
+      const kufiBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.101, 0.106, 0.056, 24),
+        capMat,
+      );
+      kufiBody.position.y = 0.064;
+      kufiBody.castShadow = true;
+      head.add(kufiBody);
+
+      const kufiDome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.102, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.52),
+        capMat,
+      );
+      kufiDome.scale.set(1, 0.52, 1);
+      kufiDome.position.y = 0.088;
+      kufiDome.castShadow = true;
+      head.add(kufiDome);
+
+      const kufiBand = new THREE.Mesh(new THREE.TorusGeometry(0.104, 0.009, 10, 24), trimMat);
+      kufiBand.rotation.x = Math.PI / 2;
+      kufiBand.position.y = 0.039;
+      head.add(kufiBand);
+    }
 
     // Articulated Arm Builder (Right: side = +1, Left: side = -1)
     function buildArm(side: -1 | 1) {
@@ -786,7 +1108,7 @@ export function PrayerCharacterScene({
       const shoulderCap = new THREE.Mesh(new THREE.SphereGeometry(0.056, 14, 14), thobeMat);
       shoulder.add(shoulderCap);
 
-      const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.044, 0.27, 14), thobeMat);
+      const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.046, 0.27, 16), thobeMat);
       upperArm.position.y = -0.135;
       upperArm.castShadow = true;
       shoulder.add(upperArm);
@@ -795,30 +1117,43 @@ export function PrayerCharacterScene({
       elbow.position.y = -0.27;
       shoulder.add(elbow);
 
-      const elbowCap = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 12), thobeMat);
+      const elbowCap = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 12), thobeMat);
       elbow.add(elbowCap);
 
       const forearm = new THREE.Group();
       elbow.add(forearm);
 
       const forearmMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.042, 0.035, 0.24, 14),
+        isGulfGhutra
+          ? new THREE.CylinderGeometry(0.044, 0.068, 0.235, 16)
+          : new THREE.CylinderGeometry(0.045, 0.049, 0.23, 16),
         thobeMat,
       );
-      forearmMesh.position.y = -0.12;
+      forearmMesh.position.y = -0.118;
       forearmMesh.castShadow = true;
       forearm.add(forearmMesh);
 
-      const cuffMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.024, 14), trimMat);
-      cuffMesh.position.y = -0.228;
-      forearm.add(cuffMesh);
+      if (isEmbroidered) {
+        const cuffMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.051, 0.053, 0.038, 16),
+          embroideryMat,
+        );
+        cuffMesh.position.y = -0.22;
+        forearm.add(cuffMesh);
+      } else if (!isGulfGhutra) {
+        const cuffMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.038, 0.038, 0.024, 14),
+          trimMat,
+        );
+        cuffMesh.position.y = -0.228;
+        forearm.add(cuffMesh);
+      }
 
       const hand = new THREE.Group();
       hand.rotation.order = 'XYZ';
       hand.position.y = -0.245;
       forearm.add(hand);
 
-      // Palm: in neutral hanging arm, inner palm faces inward (-side * X), thumb points forward (-Z)
       const palm = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.07, 0.056), skinMat);
       palm.position.y = -0.035;
       palm.castShadow = true;
@@ -829,7 +1164,6 @@ export function PrayerCharacterScene({
       thumb.rotation.x = 0.5;
       hand.add(thumb);
 
-      // Index finger (separately articulated for Tashahhud pointing!)
       const indexPivot = new THREE.Group();
       indexPivot.position.set(0, -0.07, -0.018);
       hand.add(indexPivot);
@@ -837,7 +1171,6 @@ export function PrayerCharacterScene({
       indexMesh.position.y = -0.024;
       indexPivot.add(indexMesh);
 
-      // Remaining 3 fingers grouped cleanly
       const fingersPivot = new THREE.Group();
       fingersPivot.position.set(0, -0.07, 0.006);
       hand.add(fingersPivot);
@@ -892,13 +1225,22 @@ export function PrayerCharacterScene({
       const ankleCap = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 12), skinMat);
       ankle.add(ankleCap);
 
-      // Main foot extending from heel to ball (-Z)
       const footMesh = new THREE.Mesh(new THREE.BoxGeometry(0.074, 0.048, 0.145), skinMat);
       footMesh.position.set(0, -0.024, -0.045);
       footMesh.castShadow = true;
       ankle.add(footMesh);
 
-      // Hinged toes box at front of foot (-Z) so toes curl onto prayer mat in Sujud & Jalsa
+      // Subtle sandal / strap accents matching reference images while keeping toes clean
+      if (isEmbroidered || isGulfGhutra) {
+        const strap = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.02, 0.045), sandalMat);
+        strap.position.set(0, -0.008, -0.06);
+        ankle.add(strap);
+
+        const sole = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.012, 0.175), sandalMat);
+        sole.position.set(0, -0.046, -0.062);
+        ankle.add(sole);
+      }
+
       const toes = new THREE.Group();
       toes.position.set(0, -0.024, -0.116);
       ankle.add(toes);
@@ -914,16 +1256,24 @@ export function PrayerCharacterScene({
     const rightLeg = buildLeg(1);
     const leftLeg = buildLeg(-1);
 
-    // Modest lower thobe skirt panel for standing/bowing postures
+    // Ankle-length lower white thobe robe for standing/bowing postures
+    const skirtHeight = isEmbroidered || isGulfGhutra ? 0.66 : 0.48;
     const skirtMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.158, 0.205, 0.48, 22, 1, true),
+      new THREE.CylinderGeometry(
+        0.16,
+        isEmbroidered ? 0.215 : isGulfGhutra ? 0.195 : 0.205,
+        skirtHeight,
+        24,
+        1,
+        true,
+      ),
       new THREE.MeshStandardMaterial({
-        color: 0xf4efe4,
-        roughness: 0.85,
+        color: isEmbroidered ? 0xf7f8fa : isGulfGhutra ? 0xf6f7fa : 0xf4efe4,
+        roughness: isGulfGhutra ? 0.86 : 0.78,
         side: THREE.DoubleSide,
       }),
     );
-    skirtMesh.position.y = -0.24;
+    skirtMesh.position.y = -skirtHeight / 2;
     pelvis.add(skirtMesh);
 
     const current: JointTargets = { ...getPoseTargets(poseRef.current, madhhabRef.current) };
@@ -1151,6 +1501,7 @@ export function PrayerCharacterScene({
       controls.dispose();
       envTarget.dispose();
       matTex.dispose();
+      embroideryTex.dispose();
       contactTex.dispose();
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
@@ -1167,7 +1518,7 @@ export function PrayerCharacterScene({
         mount.removeChild(renderer.domElement);
       }
     };
-  }, [quality, compact]);
+  }, [quality, compact, modelId]);
 
   const handleSelectPreset = (preset: CameraPreset) => {
     setActivePreset(preset);

@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
+import { CHARACTER_MODELS } from '../data/models';
 import { MADHHAB_META, PRAYERS } from '../data/prayers';
 import type {
   CalculationMethodId,
@@ -228,6 +229,48 @@ export function SettingsAndAdminView({
               <h3 className="text-base font-semibold text-foreground">
                 Audio, Animation & Accessibility
               </h3>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">3D Character Model</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {CHARACTER_MODELS.map((model) => {
+                    const selected = prefs.characterModel === model.id;
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => onUpdatePrefs({ characterModel: model.id })}
+                        aria-pressed={selected}
+                        className={`flex items-center gap-3 rounded-control border p-2.5 text-left transition-colors cursor-pointer ${
+                          selected
+                            ? 'border-primary bg-surface-alt ring-1 ring-primary'
+                            : 'border-border bg-surface hover:bg-surface-alt/60'
+                        }`}
+                      >
+                        {model.previewImage ? (
+                          <img
+                            src={model.previewImage}
+                            alt={model.name}
+                            className="h-12 w-12 shrink-0 rounded-control object-cover bg-surface-alt"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-primary/15 text-xs font-semibold text-primary">
+                            3D
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {model.name}
+                          </p>
+                          <p className="text-[11px] text-muted line-clamp-2 mt-0.5">
+                            {model.subtitle}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field label="Display Theme" id="set-theme">

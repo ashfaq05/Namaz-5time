@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, Check, MapPin, Play } from 'lucide-react';
+import { CHARACTER_MODELS } from '../data/models';
 import { MADHHAB_META } from '../data/prayers';
 import { PrayerCharacterScene } from '../three/PrayerCharacterScene';
 import type {
@@ -84,16 +85,33 @@ export function WelcomeSetupView({
               </div>
             </div>
 
-            <div className="lg:col-span-6">
+            <div className="lg:col-span-6 space-y-2.5">
               <PrayerCharacterScene
                 pose="qiyam"
                 madhhab={prefs.madhhab}
                 theme={prefs.theme}
                 quality={prefs.animationQuality}
+                modelId={prefs.characterModel}
                 compact
                 className="h-[320px] sm:h-[370px]"
                 caption={`Qiyam · ${MADHHAB_META[prefs.madhhab].name} Preview`}
               />
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Select 3D Model">
+                {CHARACTER_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onUpdatePrefs({ characterModel: m.id })}
+                    className={`min-h-8 rounded-control border px-2.5 text-xs font-medium cursor-pointer transition-colors ${
+                      prefs.characterModel === m.id
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-surface text-foreground border-border hover:bg-surface-alt'
+                    }`}
+                  >
+                    {m.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </Surface>

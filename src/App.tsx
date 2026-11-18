@@ -394,6 +394,7 @@ export default function App() {
               <MovementsLibraryView
                 prefs={prefs}
                 learnedMovements={progress.learnedMovements}
+                onUpdatePrefs={updatePrefs}
                 onMarkLearned={handleMarkMovementLearned}
               />
             )}

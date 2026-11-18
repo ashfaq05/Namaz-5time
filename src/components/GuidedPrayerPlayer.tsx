@@ -17,10 +17,12 @@ import {
   Sun,
   X,
 } from 'lucide-react';
+import { CHARACTER_MODELS } from '../data/models';
 import { MADHHAB_META, PRAYERS } from '../data/prayers';
 import { buildPrayerSequence } from '../engine/prayerEngine';
 import { PrayerCharacterScene, type CameraPreset } from '../three/PrayerCharacterScene';
 import type {
+  CharacterModelId,
   LanguageCode,
   PlaybackSpeed,
   PrayerStep,
@@ -359,6 +361,48 @@ export function GuidedPrayerPlayer({
               </p>
             </div>
 
+            <div className="space-y-2.5">
+              <p className="text-sm font-medium text-foreground">3D Character Model</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {CHARACTER_MODELS.map((model) => {
+                  const selected = prefs.characterModel === model.id;
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => onUpdatePrefs({ characterModel: model.id })}
+                      aria-pressed={selected}
+                      className={`flex items-center gap-3 rounded-control border p-2.5 text-left transition-colors cursor-pointer ${
+                        selected
+                          ? 'border-primary bg-surface-alt ring-1 ring-primary'
+                          : 'border-border bg-surface hover:bg-surface-alt/60'
+                      }`}
+                    >
+                      {model.previewImage ? (
+                        <img
+                          src={model.previewImage}
+                          alt={model.name}
+                          className="h-12 w-12 shrink-0 rounded-control object-cover bg-surface-alt"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-primary/15 text-xs font-semibold text-primary">
+                          3D
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {model.name}
+                        </p>
+                        <p className="text-[11px] text-muted line-clamp-2 mt-0.5">
+                          {model.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div>
               <ToggleSwitch
                 id="prep-autoadvance"
@@ -504,6 +548,7 @@ export function GuidedPrayerPlayer({
             madhhab={config.madhhab}
             theme={prefs.theme}
             quality={prefs.animationQuality}
+            modelId={prefs.characterModel}
             cameraPreset={cameraPreset}
             fullScreenMode
             className="h-full w-full"
@@ -535,6 +580,21 @@ export function GuidedPrayerPlayer({
           </div>
 
           <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+            <select
+              aria-label="3D character model"
+              value={prefs.characterModel}
+              onChange={(e) =>
+                onUpdatePrefs({ characterModel: e.target.value as CharacterModelId })
+              }
+              className="min-h-9 rounded-control border border-border/85 bg-surface/92 px-2.5 text-xs font-medium text-foreground backdrop-blur-md cursor-pointer"
+            >
+              {CHARACTER_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+
             {voiceToggleControl}
 
             <button
@@ -791,6 +851,7 @@ export function GuidedPrayerPlayer({
             madhhab={config.madhhab}
             theme={prefs.theme}
             quality={prefs.animationQuality}
+            modelId={prefs.characterModel}
             cameraPreset={cameraPreset}
             className="h-[360px] sm:h-[430px] lg:h-[490px]"
             caption={`${currentStep.activity.arabicTitle} · ${currentStep.activity.rulingTag}`}
@@ -856,6 +917,21 @@ export function GuidedPrayerPlayer({
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5">
+                <select
+                  aria-label="3D character model"
+                  value={prefs.characterModel}
+                  onChange={(e) =>
+                    onUpdatePrefs({ characterModel: e.target.value as CharacterModelId })
+                  }
+                  className="min-h-10 rounded-control border border-border bg-surface px-2.5 text-xs font-medium text-foreground cursor-pointer"
+                >
+                  {CHARACTER_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+
                 {voiceToggleControl}
 
                 <button
